@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { Save, Upload } from 'lucide-react'
 import { AdminLayout } from '../layouts/AdminLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
+import { supabase } from '../lib/supabase'
 import { useState } from 'react'
 
 export const AdminSettings = () => {
@@ -53,6 +54,8 @@ export const AdminSettings = () => {
 
   const handleSave = () => {
     localStorage.setItem('cbt_settings', JSON.stringify(settings))
+    // Also save to Supabase for students to fetch
+    supabase.from('app_settings').upsert({ id: 'main', data: settings }, { onConflict: 'id' }).then(() => {})
     alert('Pengaturan berhasil disimpan!')
   }
 

@@ -6,9 +6,10 @@ import { supabase } from '../lib/supabase'
 export default function LandingPage() {
   const navigate = useNavigate()
   const [settings, setSettings] = useState(() => {
-    const saved = localStorage.getItem('cbt_settings')
+    // Try cache first (instant render)
+    const saved = localStorage.getItem('cbt_settings_cache')
     return saved ? JSON.parse(saved) : {
-      schoolName: 'NextCBT',
+      schoolName: 'CBT Online',
       schoolMotto: 'Ujian Berbasis Komputer',
       logo: null,
       tataTertib: '',
@@ -22,13 +23,30 @@ export default function LandingPage() {
   // Landing page TIDAK fetch Supabase - hemat quota
   // Exams di-fetch setelah login di halaman ExamPage
 
+  // Fetch settings from Supabase (1x, then cache for 24h)
   useEffect(() => {
-    const handleFocus = () => {
-      const saved = localStorage.getItem('cbt_settings')
-      if (saved) setSettings(JSON.parse(saved))
+    const fetchSettings = async () => {
+      const cacheTime = localStorage.getItem('cbt_settings_cache_time')
+      const now = Date.now()
+      // Only fetch if cache older than 1 hour or doesn't exist
+      if (cacheTime && (now - parseInt(cacheTime)) < 3600000) return
+
+      try {
+        const { data } = await supabase
+          .from('app_settings')
+          .select('data')
+          .eq('id', 'main')
+          .single()
+        if (data?.data) {
+          setSettings(data.data)
+          localStorage.setItem('cbt_settings_cache', JSON.stringify(data.data))
+          localStorage.setItem('cbt_settings_cache_time', String(now))
+        }
+      } catch (e) {
+        // Silently fail - use cached or default
+      }
     }
-    window.addEventListener('focus', handleFocus)
-    return () => window.removeEventListener('focus', handleFocus)
+    fetchSettings()
   }, [])
 
   // Ctrl+Shift+A → Admin
