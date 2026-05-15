@@ -7,30 +7,29 @@ import { queuedFetch } from '../utils/requestQueue'
 export default function LandingPage() {
   const navigate = useNavigate()
   const [settings, setSettings] = useState(() => {
-    // Try cache first (instant render)
     const saved = localStorage.getItem('cbt_settings_cache')
-    return saved ? JSON.parse(saved) : {
-      schoolName: 'CBT Online',
-      schoolMotto: 'Ujian Berbasis Komputer',
-      logo: null,
-      tataTertib: '',
-      tutorialPanduan: '',
-      pengumuman: '',
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      return parsed.settings || parsed // backward compat
     }
+    return { schoolName: 'CBT Online', schoolMotto: 'Ujian Berbasis Komputer', logo: null, tataTertib: '', tutorialPanduan: '', pengumuman: '' }
   })
-  const [exams, setExams] = useState([])
+  const [exams, setExams] = useState(() => {
+    const saved = localStorage.getItem('cbt_settings_cache')
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      return parsed.exams || []
+    }
+    return []
+  })
   const [activeSection, setActiveSection] = useState(null)
   const [loadingExams, setLoadingExams] = useState(false)
 
-  // Landing page TIDAK fetch Supabase - hemat quota
-  // Exams di-fetch setelah login di halaman ExamPage
-
-  // Fetch settings from Supabase (1x, then cache for 24h)
+  // Fetch combined JSON (settings + exams) from Supabase - 1 API call, cache 1h
   useEffect(() => {
-    const fetchSettings = async () => {
+    const fetchAppData = async () => {
       const cacheTime = localStorage.getItem('cbt_settings_cache_time')
       const now = Date.now()
-      // Only fetch if cache older than 1 hour or doesn't exist
       if (cacheTime && (now - parseInt(cacheTime)) < 3600000) return
 
       try {
@@ -38,15 +37,21 @@ export default function LandingPage() {
           supabase.from('app_settings').select('data').eq('id', 'main').single()
         )
         if (data?.data) {
-          setSettings(data.data)
-          localStorage.setItem('cbt_settings_cache', JSON.stringify(data.data))
+          const appData = data.data
+          // Combined format: { settings, exams, version }
+          if (appData.settings) {
+            setSettings(appData.settings)
+            setExams(appData.exams || [])
+          } else {
+            // Legacy format: settings only
+            setSettings(appData)
+          }
+          localStorage.setItem('cbt_settings_cache', JSON.stringify(appData))
           localStorage.setItem('cbt_settings_cache_time', String(now))
         }
-      } catch (e) {
-        // Silently fail - use cached or default
-      }
+      } catch (e) {}
     }
-    fetchSettings()
+    fetchAppData()
   }, [])
 
   // Ctrl+Shift+A → Admin
@@ -61,20 +66,23 @@ export default function LandingPage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [navigate])
 
-  // Jadwal di-load hanya saat user klik tab Jadwal (hemat API)
+  // Jadwal sudah ada dari combined JSON, tapi bisa refresh jika user klik
   const loadExams = async () => {
-    if (exams.length > 0) return
+    if (exams.length > 0) { setLoadingExams(false); return }
     setLoadingExams(true)
     try {
       const { data } = await queuedFetch(
         supabase.from('exams').select('id, title, duration, questions_count, description, is_active').eq('is_active', true).order('created_at', { ascending: false }).limit(10)
       )
-      setExams(data || [])
+      setExams((data || []).map((e) => ({
+        id: e.id, title: e.title, duration: e.duration, questions_count: e.questions_count,
+        meta: (() => { try { return JSON.parse(e.description || '{}') } catch { return {} } })(),
+      })))
     } catch (e) {}
     setLoadingExams(false)
   }
 
-  const getExamMeta = (exam) => { try { return JSON.parse(exam.description || '{}') } catch { return {} } }
+  const getExamMeta = (exam) => { return exam.meta || ((() => { try { return JSON.parse(exam.description || '{}') } catch { return {} } })()) }
 
   const menuItems = [
     {

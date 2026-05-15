@@ -54,11 +54,38 @@ export const AdminSettings = () => {
     }
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     localStorage.setItem('cbt_settings', JSON.stringify(settings))
-    // Also save to Supabase for students to fetch
-    supabase.from('app_settings').upsert({ id: 'main', data: settings }, { onConflict: 'id' }).then(() => {})
-    alert('Pengaturan berhasil disimpan!')
+
+    // Generate combined JSON: settings + active exams list
+    try {
+      // Fetch active exams for the combined JSON
+      const { data: exams } = await supabase
+        .from('exams')
+        .select('id, title, duration, questions_count, token, description, is_active')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+
+      const combinedData = {
+        settings,
+        exams: (exams || []).map((e) => ({
+          id: e.id,
+          title: e.title,
+          duration: e.duration,
+          questions_count: e.questions_count,
+          token: e.token,
+          meta: (() => { try { return JSON.parse(e.description || '{}') } catch { return {} } })(),
+        })),
+        version: Date.now(),
+      }
+
+      await supabase.from('app_settings').upsert({ id: 'main', data: combinedData }, { onConflict: 'id' })
+      alert('Pengaturan berhasil disimpan & dipublish!')
+    } catch (err) {
+      // Fallback: save settings only
+      await supabase.from('app_settings').upsert({ id: 'main', data: { settings, version: Date.now() } }, { onConflict: 'id' }).catch(() => {})
+      alert('Pengaturan disimpan! (jadwal gagal di-generate: ' + err.message + ')')
+    }
   }
 
   return (

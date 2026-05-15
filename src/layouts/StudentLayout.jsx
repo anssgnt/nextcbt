@@ -29,12 +29,18 @@ export const StudentLayout = ({ children, title, showBack = false, backTo }) => 
   const [syncVersion, setSyncVersion] = useState(null)
   useEffect(() => {
     try {
+      // Check exam sync versions
       const versions = JSON.parse(localStorage.getItem('exam_versions') || '{}')
       const allVersions = Object.values(versions)
       if (allVersions.length > 0) {
-        // Show the most recent version
-        const latest = Math.max(...allVersions)
-        setSyncVersion(latest)
+        setSyncVersion(Math.max(...allVersions))
+        return
+      }
+      // Fallback: check app data version
+      const cached = localStorage.getItem('cbt_settings_cache')
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        if (parsed.version) setSyncVersion(parsed.version)
       }
     } catch { /* ignore */ }
   }, [])
