@@ -4,7 +4,7 @@ import { Button, Card, Modal, Toast } from '../components'
 import { useExamStore, useAuthStore } from '../store'
 import { useExamTimer, useTabVisibility, useOnlineStatus } from '../hooks/useExam'
 import { formatTime, debounce } from '../utils/helpers'
-import { Clock, Wifi, WifiOff, List } from 'lucide-react'
+import { List } from 'lucide-react'
 
 export const ExamInterfacePage = () => {
   const { examId } = useParams()
@@ -219,20 +219,16 @@ export const ExamInterfacePage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="sticky top-0 bg-white border-b border-gray-200 shadow-sm z-40 px-4 py-3">
+      {/* Header - minimal */}
+      <div className="sticky top-0 bg-white border-b border-gray-200 z-40 px-4 py-2.5">
         <div className="flex items-center justify-between">
-          <div className="min-w-0">
-            <h1 className="text-sm font-bold text-gray-900 truncate">{currentExam.title}</h1>
-            <p className="text-xs text-gray-500">Soal {currentQuestionIndex + 1} dari {questions.length}</p>
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-mono font-bold ${timeRemaining < 300 ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700'}`}>
-              <Clock size={14} />
+          <p className="text-xs text-gray-500">Soal {currentQuestionIndex + 1}/{questions.length}</p>
+          <div className="flex items-center gap-2">
+            <span className={`text-xs font-mono font-bold px-2 py-1 rounded ${timeRemaining < 300 ? 'bg-red-50 text-red-700' : 'text-gray-700'}`}>
               {formatTime(timeRemaining)}
-            </div>
-            <button onClick={() => setShowNav(!showNav)} className={`p-2 rounded-lg transition ${showNav ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
-              <List size={18} />
+            </span>
+            <button onClick={() => setShowNav(!showNav)} className={`p-1.5 rounded-lg ${showNav ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
+              <List size={16} />
             </button>
           </div>
         </div>
@@ -279,16 +275,19 @@ export const ExamInterfacePage = () => {
           <button onClick={() => toggleMarkQuestion(currentQuestion.id)} className={`px-4 py-2.5 rounded-xl text-sm font-medium ${isMarked ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600'}`}>
             {isMarked ? '★' : '☆'}
           </button>
-          {currentQuestionIndex < questions.length - 1 ? (
+          {currentQuestionIndex < questions.length - 1 && (
             <button onClick={() => setCurrentQuestionIndex(currentQuestionIndex + 1)} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium">
               Selanjutnya
             </button>
-          ) : (
-            <button onClick={() => setShowSubmitModal(true)} className="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-sm font-medium">
-              Selesai
-            </button>
           )}
         </div>
+
+        {/* Submit button - only at last question */}
+        {currentQuestionIndex === questions.length - 1 && (
+          <button onClick={() => setShowSubmitModal(true)} className="w-full mt-3 py-3 bg-red-600 text-white rounded-xl text-sm font-bold hover:bg-red-700 transition active:scale-[0.98]">
+            Kumpulkan Jawaban ({answeredCount}/{questions.length} dijawab)
+          </button>
+        )}
       </div>
 
       {/* Modals */}
