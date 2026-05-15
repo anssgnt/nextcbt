@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BookOpen, Download, CheckCircle, Loader2, Wifi, WifiOff } from 'lucide-react'
+import { BookOpen, Download, CheckCircle, Loader2, Wifi, WifiOff, KeyRound, X, Clock } from 'lucide-react'
 import { useAuthStore } from '../store'
 import { supabase } from '../lib/supabase'
 import { StudentLayout } from '../layouts/StudentLayout'
@@ -14,6 +14,9 @@ export const ExamPage = () => {
   const [syncedExams, setSyncedExams] = useState(() => {
     try { return JSON.parse(localStorage.getItem('synced_exams') || '{}') } catch { return {} }
   })
+  const [tokenModal, setTokenModal] = useState(null) // exam object
+  const [tokenInput, setTokenInput] = useState('')
+  const [tokenError, setTokenError] = useState('')
   const isOnline = navigator.onLine
 
   useEffect(() => { loadExams() }, [])
@@ -44,7 +47,73 @@ export const ExamPage = () => {
     }
   }
 
-  const handleSync = async (exam) => {
+  // Step 1: Klik "Masuk Ujian" → tampilkan modal token
+  const handleMasukUjian = (exam) => {
+    // Jika sudah sync, langsung minta token
+    setTokenModal(exam)
+    setTokenInput('')
+    setTokenError('')
+  }
+
+  // Step 2: Validasi token
+  const handleValidateToken = () => {
+    if (!tokenInput.trim()) { setTokenError('Masukkan token ujian'); return }
+    if (tokenInput.trim().toUpperCase() !== tokenModal.token) {
+      setTokenError('Token tidak valid')
+      return
+    }
+    // Token valid → cek apakah sudah sync
+    if (syncedExams[tokenModal.id]) {
+      // Sudah sync → langsung mulai
+      setTokenModal(null)
+      navigate(`/exam/${tokenModal.id}`)
+    } else {
+      // Belum sync → sync dulu
+      handleSyncAndStart(tokenModal)
+    }
+  }
+
+  // Step 3: Sync soal lalu mulai
+  const handleSyncAndStart = async (exam) => {
+    setSyncing(exam.id)
+    setTokenError('')
+    try {
+      const meta = JSON.parse(exam.description || '{}')
+      const bankSoal = meta.bank_soal || meta.subject
+      let questions = []
+      if (bankSoal) {
+        const { data } = await supabase
+          .from('questions')
+          .select('id, question_text, type, options, correct_answer, score, matching_pairs, subject')
+          .eq('subject', bankSoal)
+        questions = data || []
+      }
+
+      // Simpan ke localStorage
+      const examData = {
+        exam: { id: exam.id, title: exam.title, duration: exam.duration, questions_count: questions.length },
+        questions,
+        syncedAt: Date.now(),
+        meta,
+      }
+      localStorage.setItem(`exam_data_${exam.id}`, JSON.stringify(examData))
+
+      const newSynced = { ...syncedExams, [exam.id]: Date.now() }
+      setSyncedExams(newSynced)
+      localStorage.setItem('synced_exams', JSON.stringify(newSynced))
+
+      // Langsung mulai ujian
+      setTokenModal(null)
+      navigate(`/exam/${exam.id}`)
+    } catch (err) {
+      setTokenError('Sync gagal: ' + err.message)
+    } finally {
+      setSyncing(null)
+    }
+  }
+
+  // Sync tanpa mulai (pre-sync)
+  const handlePreSync = async (exam) => {
     setSyncing(exam.id)
     try {
       const meta = JSON.parse(exam.description || '{}')
@@ -57,7 +126,12 @@ export const ExamPage = () => {
           .eq('subject', bankSoal)
         questions = data || []
       }
-      const examData = { exam: { id: exam.id, title: exam.title, duration: exam.duration, questions_count: questions.length }, questions, syncedAt: Date.now(), meta }
+      const examData = {
+        exam: { id: exam.id, title: exam.title, duration: exam.duration, questions_count: questions.length },
+        questions,
+        syncedAt: Date.now(),
+        meta: JSON.parse(exam.description || '{}'),
+      }
       localStorage.setItem(`exam_data_${exam.id}`, JSON.stringify(examData))
       const newSynced = { ...syncedExams, [exam.id]: Date.now() }
       setSyncedExams(newSynced)
@@ -69,11 +143,6 @@ export const ExamPage = () => {
     }
   }
 
-  const handleStartExam = (examId) => {
-    if (!syncedExams[examId]) { alert('Sync soal dulu'); return }
-    navigate(`/exam/${examId}`)
-  }
-
   const getExamMeta = (exam) => { try { return JSON.parse(exam.description || '{}') } catch { return {} } }
 
   return (
@@ -82,8 +151,8 @@ export const ExamPage = () => {
       <div className="bg-blue-600 text-white px-4 py-5">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold">Daftar Ujian</h1>
-            <p className="text-blue-100 text-sm mt-0.5">Halo, {user?.name || 'Siswa'}</p>
+            <h1 className="text-xl font-bold">Jadwal Ujian</h1>
+            <p className="text-blue-100 text-sm mt-0.5">{user?.name} • {user?.class_name || '-'}</p>
           </div>
           <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs ${isOnline ? 'bg-green-500/20' : 'bg-red-500/20'}`}>
             {isOnline ? <Wifi size={14} /> : <WifiOff size={14} />}
@@ -92,55 +161,118 @@ export const ExamPage = () => {
         </div>
       </div>
 
-      {/* Info */}
-      <div className="px-4 py-3">
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-800">
-          <p className="font-semibold mb-1">📱 Cara mengerjakan:</p>
-          <p>1. Klik "Sync Soal" untuk download ke HP</p>
-          <p>2. Setelah sync, klik "Mulai Ujian"</p>
-          <p>3. Ujian bisa offline setelah sync</p>
-        </div>
-      </div>
-
       {/* List */}
-      <div className="px-4 space-y-3 pb-4">
+      <div className="px-4 py-4 space-y-3">
         {loading ? (
           <div className="flex justify-center py-12"><Loader2 size={32} className="animate-spin text-blue-600" /></div>
         ) : exams.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
             <BookOpen size={48} className="mx-auto mb-3 text-gray-300" />
-            <p className="font-medium">Belum ada ujian tersedia</p>
+            <p className="font-medium">Belum ada ujian aktif</p>
+            <p className="text-sm mt-1">Hubungi guru jika ada masalah</p>
           </div>
         ) : (
           exams.map((exam) => {
             const meta = getExamMeta(exam)
             const isSynced = !!syncedExams[exam.id]
             const isSyncing = syncing === exam.id
+
             return (
               <div key={exam.id} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
                 <div className="flex items-start justify-between mb-3">
-                  <div>
+                  <div className="flex-1">
                     <h3 className="font-bold text-gray-900">{exam.title}</h3>
-                    <p className="text-xs text-gray-500 mt-0.5">{meta.subject || '-'} • {exam.duration} menit • {exam.questions_count || '?'} soal</p>
-                    {meta.kelas && <p className="text-xs text-purple-600 mt-0.5">Kelas: {meta.kelas}</p>}
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <span className="text-xs text-gray-500 flex items-center gap-1"><Clock size={12} />{exam.duration} menit</span>
+                      <span className="text-xs text-gray-500">{exam.questions_count || '?'} soal</span>
+                      {meta.kelas && <span className="text-xs text-purple-600">{meta.kelas}</span>}
+                    </div>
                   </div>
-                  {isSynced && <span className="flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full"><CheckCircle size={12} /> Siap</span>}
+                  {isSynced && (
+                    <span className="flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 text-[10px] rounded-full flex-shrink-0">
+                      <CheckCircle size={10} /> Siap Offline
+                    </span>
+                  )}
                 </div>
+
                 <div className="flex gap-2">
-                  <button onClick={() => handleSync(exam)} disabled={isSyncing || !isOnline} className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition ${isSynced ? 'bg-gray-100 text-gray-600' : 'bg-blue-100 text-blue-700'} disabled:opacity-50`}>
-                    {isSyncing ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-                    {isSyncing ? 'Syncing...' : isSynced ? 'Sync Ulang' : 'Sync Soal'}
+                  {/* Pre-sync button */}
+                  <button
+                    onClick={() => handlePreSync(exam)}
+                    disabled={isSyncing || !isOnline}
+                    className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-50 transition"
+                  >
+                    {isSyncing ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                    {isSyncing ? 'Sync...' : 'Sync'}
                   </button>
-                  <button onClick={() => handleStartExam(exam.id)} disabled={!isSynced} className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition">
-                    <BookOpen size={16} /> Mulai Ujian
+
+                  {/* Masuk Ujian button */}
+                  <button
+                    onClick={() => handleMasukUjian(exam)}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition active:scale-95"
+                  >
+                    <KeyRound size={16} /> Masuk Ujian
                   </button>
                 </div>
-                {isSynced && <p className="text-[10px] text-gray-400 mt-2 text-center">Sync: {new Date(syncedExams[exam.id]).toLocaleString('id-ID')}</p>}
+
+                {isSynced && (
+                  <p className="text-[10px] text-gray-400 mt-2 text-center">
+                    Sync: {new Date(syncedExams[exam.id]).toLocaleString('id-ID')}
+                  </p>
+                )}
               </div>
             )
           })
         )}
       </div>
+
+      {/* Token Modal */}
+      {tokenModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-lg text-gray-900">Masukkan Token</h3>
+              <button onClick={() => setTokenModal(null)} className="p-1 hover:bg-gray-100 rounded-lg">
+                <X size={20} />
+              </button>
+            </div>
+
+            <p className="text-sm text-gray-600 mb-4">
+              Ujian: <span className="font-semibold">{tokenModal.title}</span>
+            </p>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Token Ujian</label>
+              <input
+                type="text"
+                value={tokenInput}
+                onChange={(e) => { setTokenInput(e.target.value.toUpperCase()); setTokenError('') }}
+                placeholder="Masukkan token dari pengawas"
+                maxLength={6}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl text-center text-lg font-mono tracking-widest uppercase focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                autoFocus
+              />
+              {tokenError && <p className="text-red-600 text-xs mt-2">{tokenError}</p>}
+            </div>
+
+            <button
+              onClick={handleValidateToken}
+              disabled={syncing === tokenModal.id}
+              className="w-full flex items-center justify-center gap-2 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 disabled:opacity-50 transition"
+            >
+              {syncing === tokenModal.id ? (
+                <><Loader2 size={18} className="animate-spin" /> Menyiapkan soal...</>
+              ) : (
+                <><BookOpen size={18} /> Mulai Ujian</>
+              )}
+            </button>
+
+            <p className="text-xs text-gray-400 text-center mt-3">
+              Token didapat dari guru pengawas
+            </p>
+          </div>
+        </div>
+      )}
     </StudentLayout>
   )
 }

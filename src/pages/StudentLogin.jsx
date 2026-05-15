@@ -2,52 +2,34 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store'
 import { supabase } from '../lib/supabase'
-import { LogIn, BookOpen, KeyRound, User } from 'lucide-react'
+import { LogIn, BookOpen, User } from 'lucide-react'
 
 export const StudentLogin = () => {
   const navigate = useNavigate()
   const setUser = useAuthStore((state) => state.setUser)
   const [nis, setNis] = useState('')
-  const [token, setToken] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
 
   const handleLogin = async (e) => {
     e.preventDefault()
     setError('')
-
     if (!nis.trim()) { setError('Masukkan NIS'); return }
-    if (!token.trim()) { setError('Masukkan Token Ujian'); return }
 
     setIsLoading(true)
     try {
-      // 1. Cari siswa berdasarkan NIS
-      const { data: student, error: studentErr } = await supabase
+      const { data: student, error: err } = await supabase
         .from('students')
-        .select('id, name, nis, class_name')
+        .select('id, name, nis, class_name, email')
         .eq('nis', nis.trim())
         .single()
 
-      if (studentErr || !student) {
+      if (err || !student) {
         setError('NIS tidak ditemukan')
         return
       }
 
-      // 2. Validasi token ujian
-      const { data: exam, error: examErr } = await supabase
-        .from('exams')
-        .select('id, title, token, is_active')
-        .eq('token', token.trim().toUpperCase())
-        .eq('is_active', true)
-        .single()
-
-      if (examErr || !exam) {
-        setError('Token ujian tidak valid atau ujian tidak aktif')
-        return
-      }
-
-      // 3. Login berhasil
-      setUser({ ...student, examId: exam.id, examTitle: exam.title }, 'student')
+      setUser(student, 'student')
       navigate('/student/dashboard')
     } catch (err) {
       setError('Login gagal. Coba lagi.')
@@ -60,7 +42,6 @@ export const StudentLogin = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-600 to-blue-500 flex flex-col items-center justify-center p-4">
-      {/* Card */}
       <div className="w-full max-w-sm">
         {/* Header */}
         <div className="text-center text-white mb-8">
@@ -80,7 +61,6 @@ export const StudentLogin = () => {
           <h2 className="text-lg font-bold text-gray-900 text-center mb-6">Login Siswa</h2>
 
           <form onSubmit={handleLogin} className="space-y-4">
-            {/* NIS */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 <User size={14} className="inline mr-1.5" />NIS (Nomor Induk Siswa)
@@ -92,33 +72,16 @@ export const StudentLogin = () => {
                 placeholder="Masukkan NIS Anda"
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 autoComplete="off"
+                inputMode="numeric"
               />
             </div>
 
-            {/* Token */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                <KeyRound size={14} className="inline mr-1.5" />Token Ujian
-              </label>
-              <input
-                type="text"
-                value={token}
-                onChange={(e) => setToken(e.target.value.toUpperCase())}
-                placeholder="Masukkan 4 karakter token"
-                maxLength={6}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm font-mono tracking-widest uppercase focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center text-lg"
-                autoComplete="off"
-              />
-            </div>
-
-            {/* Error */}
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2.5 rounded-xl text-sm">
                 {error}
               </div>
             )}
 
-            {/* Submit */}
             <button
               type="submit"
               disabled={isLoading}
@@ -129,16 +92,15 @@ export const StudentLogin = () => {
               ) : (
                 <LogIn size={18} />
               )}
-              {isLoading ? 'Memverifikasi...' : 'Masuk Ujian'}
+              {isLoading ? 'Memverifikasi...' : 'Masuk'}
             </button>
           </form>
 
           <p className="text-xs text-gray-400 text-center mt-4">
-            Token didapat dari guru/pengawas ujian
+            Hubungi guru jika lupa NIS
           </p>
         </div>
 
-        {/* Footer */}
         <p className="text-center text-blue-100 text-xs mt-6">
           © {new Date().getFullYear()} {settings.schoolName || 'NextCBT'}
         </p>
