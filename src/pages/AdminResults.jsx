@@ -58,6 +58,30 @@ export const AdminResults = () => {
     a.click()
   }
 
+  const handlePrintResults = () => {
+    const settings = JSON.parse(localStorage.getItem('cbt_settings') || '{}')
+    const schoolName = settings.schoolName || 'Sekolah'
+    const examTitle = selectedExam === 'all' ? 'Semua Ujian' : selectedExam
+    const w = window.open('', '_blank')
+    w.document.write(`<html><head><title>Hasil Ujian - ${examTitle}</title>`)
+    w.document.write(`<style>body{font-family:Arial,sans-serif;padding:40px;font-size:12px}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #333;padding:8px;text-align:left}th{background:#f0f0f0;font-weight:bold}.header{text-align:center;margin-bottom:20px}h2{margin:0 0 4px 0}p{margin:4px 0}.pass{color:green;font-weight:bold}.fail{color:red;font-weight:bold}@media print{body{padding:20px}}</style>`)
+    w.document.write(`</head><body>`)
+    w.document.write(`<div class="header"><h2>${schoolName}</h2><p>DAFTAR HASIL UJIAN</p></div>`)
+    w.document.write(`<p><b>Ujian:</b> ${examTitle}</p>`)
+    w.document.write(`<p><b>Jumlah Peserta:</b> ${filteredResults.length}</p>`)
+    w.document.write(`<p><b>Rata-rata:</b> ${avgScore}</p>`)
+    w.document.write(`<p><b>Kelulusan:</b> ${passRate}% (${passCount} dari ${totalStudents})</p>`)
+    w.document.write(`<table><thead><tr><th style="width:30px">No</th><th>Nama Siswa</th><th>Ujian</th><th style="width:60px">Nilai</th><th style="width:80px">Status</th><th>Tanggal</th></tr></thead><tbody>`)
+    filteredResults.forEach((r, idx) => {
+      w.document.write(`<tr><td>${idx + 1}</td><td>${r.studentName}</td><td>${r.exam}</td><td class="${r.score >= 70 ? 'pass' : 'fail'}">${r.score}</td><td>${r.status}</td><td>${r.date}</td></tr>`)
+    })
+    w.document.write(`</tbody></table>`)
+    w.document.write(`<p style="margin-top:30px;font-size:10px;color:#666">Dicetak: ${new Date().toLocaleString('id-ID')}</p>`)
+    w.document.write(`</body></html>`)
+    w.document.close()
+    w.print()
+  }
+
   // Stats
   const totalStudents = filteredResults.length
   const avgScore = totalStudents > 0 ? Math.round(filteredResults.reduce((s, r) => s + r.score, 0) / totalStudents) : 0
@@ -98,9 +122,14 @@ export const AdminResults = () => {
             <h1 className="text-2xl font-bold text-gray-900">Hasil & Analitik</h1>
             <p className="text-sm text-gray-600">Data dari Supabase</p>
           </div>
-          <button onClick={handleExportResults} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">
-            <Download size={18} /> Export CSV
-          </button>
+          <div className="flex gap-2">
+            <button onClick={handlePrintResults} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
+              <Download size={18} /> Cetak Hasil
+            </button>
+            <button onClick={handleExportResults} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">
+              <Download size={18} /> Export CSV
+            </button>
+          </div>
         </div>
 
         {/* Tabs */}

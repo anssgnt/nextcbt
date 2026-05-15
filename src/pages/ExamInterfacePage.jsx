@@ -47,6 +47,11 @@ export const ExamInterfacePage = () => {
       setCurrentExam(examData.exam)
       let q = examData.questions || []
       if (examData.meta?.shuffle) q = [...q].sort(() => Math.random() - 0.5)
+      // Feature 5: Question limit - randomly pick N questions
+      const questionsLimit = examData.meta?.questions_limit
+      if (questionsLimit && questionsLimit > 0 && q.length > questionsLimit) {
+        q = [...q].sort(() => Math.random() - 0.5).slice(0, questionsLimit)
+      }
       setQuestions(q)
       if (!sessionId) setSessionId(`session_${examId}_${Date.now()}`)
     } catch { setToast({ type: 'error', message: 'Gagal memuat soal' }) }
@@ -69,19 +74,44 @@ export const ExamInterfacePage = () => {
     try {
       const savedAnswers = JSON.parse(localStorage.getItem(`answers_${examId}`) || '{}')
       const allAnswers = { ...savedAnswers, ...answers }
+      const finalScore = calculateScore(allAnswers)
+
       if (isOnline) {
         try {
           const { queuedFetch } = await import('../utils/requestQueue')
           const { supabase } = await import('../lib/supabase')
           await queuedFetch(supabase.from('exam_sessions').insert({
             student_id: user?.id, exam_id: examId, status: 'submitted',
-            score: calculateScore(allAnswers), submitted_at: new Date().toISOString(),
+            score: finalScore, submitted_at: new Date().toISOString(),
           }))
         } catch { localStorage.setItem(`pending_submit_${examId}`, JSON.stringify(allAnswers)) }
       } else {
         localStorage.setItem(`pending_submit_${examId}`, JSON.stringify(allAnswers))
         setToast({ type: 'info', message: 'Jawaban disimpan. Akan dikirim saat online.' })
       }
+
+      // Save result detail for ResultPage
+      let correctCount = 0
+      let wrongCount = 0
+      questions.forEach((q) => {
+        const a = allAnswers[q.id]
+        if (a && q.correct_answer) {
+          if (Array.isArray(a)) { if (a.sort().join(',') === q.correct_answer) correctCount++; else wrongCount++ }
+          else if (a === q.correct_answer) correctCount++
+          else wrongCount++
+        } else { wrongCount++ }
+      })
+      const resultData = {
+        score: finalScore,
+        correctCount,
+        wrongCount,
+        totalQuestions: questions.length,
+        questions,
+        answers: allAnswers,
+        examTitle: currentExam?.title || '',
+      }
+      localStorage.setItem(`exam_result_${examId}`, JSON.stringify(resultData))
+
       localStorage.removeItem(`answers_${examId}`)
       // Mark as completed
       const completed = JSON.parse(localStorage.getItem('completed_exams') || '{}')
@@ -89,7 +119,7 @@ export const ExamInterfacePage = () => {
       localStorage.setItem('completed_exams', JSON.stringify(completed))
       // Exit fullscreen
       try { document.exitFullscreen?.() } catch {}
-      navigate('/student/exams')
+      navigate(`/result/${examId}`)
     } catch { setToast({ type: 'error', message: 'Gagal submit' }) }
   }
 

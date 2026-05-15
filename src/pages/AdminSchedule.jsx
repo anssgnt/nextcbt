@@ -35,6 +35,7 @@ export const AdminSchedule = () => {
     shuffle: true,
     duration: 120,
     kelas: '',
+    questions_limit: 0,
   })
 
   useEffect(() => {
@@ -209,6 +210,7 @@ export const AdminSchedule = () => {
           start_datetime: startDateTime,
           end_datetime: endDateTime,
           shuffle: form.shuffle,
+          questions_limit: form.questions_limit || 0,
         }),
       }
 
@@ -236,6 +238,7 @@ export const AdminSchedule = () => {
         shuffle: true,
         duration: 120,
         kelas: '',
+        questions_limit: 0,
       })
     } catch (err) {
       alert('Gagal menyimpan: ' + err.message)
@@ -362,6 +365,13 @@ export const AdminSchedule = () => {
                     <span className="text-sm font-medium text-gray-700">Acak Soal</span>
                   </label>
                 </div>
+              </div>
+
+              {/* Jumlah Soal Ditampilkan */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Jumlah Soal Ditampilkan</label>
+                <input type="number" value={form.questions_limit} onChange={(e) => setForm({ ...form, questions_limit: parseInt(e.target.value) || 0 })} min="0" placeholder="0 = semua soal" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                <p className="text-xs text-gray-400 mt-1">0 = tampilkan semua soal dari bank. Jika diisi (misal 30), hanya 30 soal acak yang ditampilkan ke siswa.</p>
               </div>
 
               {/* Actions */}
@@ -554,6 +564,7 @@ export const AdminSchedule = () => {
                                     shuffle: m.shuffle || false,
                                     duration: exam.duration || 120,
                                     kelas: m.kelas || '',
+                                    questions_limit: m.questions_limit || 0,
                                   })
                                   setEditId(exam.id)
                                   setShowForm(true)

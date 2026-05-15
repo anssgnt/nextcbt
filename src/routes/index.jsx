@@ -48,7 +48,7 @@ export const router = createBrowserRouter([
   { path: "/student/dashboard", element: <ProtectedRoute requiredRole="student"><Suspense fallback={<LoadingFallback />}><StudentDashboard /></Suspense></ProtectedRoute> },
   { path: "/student/exams", element: <ProtectedRoute requiredRole="student"><Suspense fallback={<LoadingFallback />}><ExamPage /></Suspense></ProtectedRoute> },
   { path: "/exam/:examId", element: <ProtectedRoute requiredRole="student"><Suspense fallback={<LoadingFallback />}><ExamInterfacePage /></Suspense></ProtectedRoute> },
-  { path: "/result/:sessionId", element: <ProtectedRoute requiredRole="student"><Suspense fallback={<LoadingFallback />}><ResultPage /></Suspense></ProtectedRoute> },
+  { path: "/result/:examId", element: <ProtectedRoute requiredRole="student"><Suspense fallback={<LoadingFallback />}><ResultPage /></Suspense></ProtectedRoute> },
   { path: "/announcements", element: <ProtectedRoute requiredRole="student"><Suspense fallback={<LoadingFallback />}><AnnouncementsPage /></Suspense></ProtectedRoute> },
   { path: "/results", element: <ProtectedRoute requiredRole="student"><Suspense fallback={<LoadingFallback />}><ResultsPage /></Suspense></ProtectedRoute> },
   { path: "/profile", element: <ProtectedRoute requiredRole="student"><Suspense fallback={<LoadingFallback />}><ProfilePage /></Suspense></ProtectedRoute> },

@@ -67,6 +67,23 @@ export const ExamPage = () => {
 
   // Step 1: Klik "Masuk Ujian" → tampilkan modal token
   const handleMasukUjian = (exam) => {
+    // Feature 4: Time enforcement
+    const meta = getExamMeta(exam)
+    const now = new Date()
+    if (meta.start_datetime) {
+      const start = new Date(meta.start_datetime)
+      if (now < start) {
+        alert('⏰ Ujian belum dimulai.\nWaktu mulai: ' + start.toLocaleString('id-ID'))
+        return
+      }
+    }
+    if (meta.end_datetime) {
+      const end = new Date(meta.end_datetime)
+      if (now > end) {
+        alert('⏰ Ujian sudah berakhir.\nWaktu selesai: ' + end.toLocaleString('id-ID'))
+        return
+      }
+    }
     // Jika sudah sync, langsung minta token
     setTokenModal(exam)
     setTokenInput('')
@@ -277,6 +294,12 @@ export const ExamPage = () => {
                       <span className="text-xs text-gray-500">{exam.questions_count || '?'} soal</span>
                       {meta.kelas && <span className="text-xs text-purple-600">{meta.kelas}</span>}
                     </div>
+                    {meta.start_datetime && (
+                      <p className="text-[11px] text-gray-400 mt-1">
+                        {new Date(meta.start_datetime).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        {meta.end_datetime && ` - ${new Date(meta.end_datetime).toLocaleString('id-ID', { hour: '2-digit', minute: '2-digit' })}`}
+                      </p>
+                    )}
                   </div>
                   {isSynced && (
                     <span className="flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 text-[10px] rounded-full flex-shrink-0">

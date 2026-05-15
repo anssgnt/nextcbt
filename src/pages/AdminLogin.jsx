@@ -2,6 +2,8 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store'
 import { Shield } from 'lucide-react'
+import { supabase } from '../lib/supabase'
+import { queuedFetch } from '../utils/requestQueue'
 
 export const AdminLogin = () => {
   const navigate = useNavigate()
@@ -15,14 +17,30 @@ export const AdminLogin = () => {
     e.preventDefault()
     setError('')
     setIsLoading(true)
-    await new Promise((r) => setTimeout(r, 500))
 
+    try {
+      // Check against admins table in Supabase
+      const { data, error: dbError } = await queuedFetch(
+        supabase.from('admins').select('id, email, name').eq('email', email).eq('password', password).single()
+      )
+
+      if (!dbError && data) {
+        setUser({ id: data.id, email: data.email, name: data.name || 'Admin' }, 'admin')
+        navigate('/admin/dashboard')
+        return
+      }
+    } catch {
+      // DB check failed, fall through to mock credentials
+    }
+
+    // Fallback: mock credentials
     if (email === 'admin@cbt.com' && password === 'admin123') {
       setUser({ id: 'admin-1', email, name: 'Admin' }, 'admin')
       navigate('/admin/dashboard')
     } else {
       setError('Email atau password salah')
     }
+
     setIsLoading(false)
   }
 
