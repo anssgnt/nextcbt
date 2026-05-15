@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Button, Card, Modal, Toast } from '../components'
 import { useExamStore, useAuthStore } from '../store'
 import { useExamTimer, useTabVisibility, useOnlineStatus } from '../hooks/useExam'
-import { studentService } from '../services/api'
 import { formatTime, debounce } from '../utils/helpers'
 import { Clock, AlertCircle, Wifi, WifiOff } from 'lucide-react'
 
