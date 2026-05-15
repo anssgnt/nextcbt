@@ -140,6 +140,7 @@ export const AdminResults = () => {
                       <th className="px-4 py-3 text-left font-semibold">Nilai</th>
                       <th className="px-4 py-3 text-left font-semibold">Status</th>
                       <th className="px-4 py-3 text-left font-semibold">Tanggal</th>
+                      <th className="px-4 py-3 text-left font-semibold">Aksi</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -150,6 +151,20 @@ export const AdminResults = () => {
                         <td className="px-4 py-3"><span className={`font-bold ${r.score >= 70 ? 'text-green-600' : 'text-red-600'}`}>{r.score}</span></td>
                         <td className="px-4 py-3"><span className={`px-2 py-1 rounded-full text-xs font-semibold ${r.status === 'Lulus' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{r.status}</span></td>
                         <td className="px-4 py-3 text-gray-600">{r.date}</td>
+                        <td className="px-4 py-3">
+                          <button
+                            onClick={async () => {
+                              if (!confirm(`Izinkan ${r.studentName} ujian ulang "${r.exam}"?`)) return
+                              try {
+                                await supabase.from('exam_sessions').delete().eq('id', r.id)
+                                setResults(results.filter((x) => x.id !== r.id))
+                              } catch (err) { alert('Gagal: ' + err.message) }
+                            }}
+                            className="px-2 py-1 text-xs bg-orange-100 text-orange-700 rounded hover:bg-orange-200 font-medium"
+                          >
+                            Remidi
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
