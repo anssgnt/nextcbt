@@ -18,6 +18,8 @@ export const ExamPage = () => {
   const [tokenModal, setTokenModal] = useState(null) // exam object
   const [tokenInput, setTokenInput] = useState('')
   const [tokenError, setTokenError] = useState('')
+  const [syncError, setSyncError] = useState(null) // {examId, message}
+  const [loadError, setLoadError] = useState(null)
   const isOnline = navigator.onLine
 
   useEffect(() => { loadExams() }, [])
@@ -40,7 +42,7 @@ export const ExamPage = () => {
       })
       setExams(filtered)
     } catch (err) {
-      console.error('Failed to load exams:', err)
+      setLoadError(err.message || 'Gagal memuat jadwal ujian')
     } finally {
       setLoading(false)
     }
@@ -113,6 +115,7 @@ export const ExamPage = () => {
   // Sync tanpa mulai (pre-sync)
   const handlePreSync = async (exam) => {
     setSyncing(exam.id)
+    setSyncError(null)
     try {
       const meta = JSON.parse(exam.description || '{}')
       const bankSoal = meta.bank_soal || meta.subject
@@ -134,7 +137,7 @@ export const ExamPage = () => {
       setSyncedExams(newSynced)
       localStorage.setItem('synced_exams', JSON.stringify(newSynced))
     } catch (err) {
-      alert('Sync gagal: ' + err.message)
+      setSyncError({ examId: exam.id, message: err.message || 'Koneksi gagal' })
     } finally {
       setSyncing(null)
     }
@@ -161,7 +164,34 @@ export const ExamPage = () => {
       {/* List */}
       <div className="px-4 py-4 space-y-3">
         {loading ? (
-          <div className="flex justify-center py-12"><Loader2 size={32} className="animate-spin text-blue-600" /></div>
+          <div className="space-y-3">
+            {[1,2,3].map((i) => (
+              <div key={i} className="bg-white rounded-xl p-4 border border-gray-100 animate-pulse">
+                <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                <div className="h-3 bg-gray-200 rounded w-1/2 mb-3"></div>
+                <div className="flex gap-2">
+                  <div className="h-10 bg-gray-200 rounded-lg flex-1"></div>
+                  <div className="h-10 bg-gray-200 rounded-lg flex-1"></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : loadError ? (
+          <div className="text-center py-12">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+              </svg>
+            </div>
+            <p className="font-medium text-gray-800 mb-1">Gagal Memuat Jadwal</p>
+            <p className="text-sm text-gray-500 mb-4">{loadError}</p>
+            <button
+              onClick={() => { setLoadError(null); loadExams() }}
+              className="px-6 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition"
+            >
+              Coba Lagi
+            </button>
+          </div>
         ) : exams.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
             <BookOpen size={48} className="mx-auto mb-3 text-gray-300" />
@@ -216,10 +246,31 @@ export const ExamPage = () => {
                 </div>
 
                 {/* Notice sync dulu */}
-                {!isSynced && (
+                {!isSynced && !syncError?.examId && (
                   <p className="text-[11px] text-orange-600 mt-2 text-center bg-orange-50 rounded-lg py-1.5 px-2">
                     ⚠️ Sync soal terlebih dahulu sebelum mulai ujian
                   </p>
+                )}
+
+                {/* Error sync */}
+                {syncError?.examId === exam.id && (
+                  <div className="mt-2 p-2.5 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-xs text-red-700 font-medium mb-1.5">❌ Sync gagal: {syncError.message}</p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => { setSyncError(null); handlePreSync(exam) }}
+                        className="flex-1 text-xs py-1.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition"
+                      >
+                        Coba Lagi
+                      </button>
+                      <button
+                        onClick={() => setSyncError(null)}
+                        className="text-xs py-1.5 px-3 text-red-600 hover:bg-red-100 rounded-lg transition"
+                      >
+                        Tutup
+                      </button>
+                    </div>
+                  </div>
                 )}
 
                 {isSynced && (
