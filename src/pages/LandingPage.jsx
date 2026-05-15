@@ -17,7 +17,10 @@ export default function LandingPage() {
     }
   })
   const [exams, setExams] = useState([])
-  const [activeSection, setActiveSection] = useState(null) // null = menu icons, 'jadwal' | 'tatatertib' | 'tutorial' | 'pengumuman'
+  const [activeSection, setActiveSection] = useState(null)
+
+  // Landing page TIDAK fetch Supabase - hemat quota
+  // Exams di-fetch setelah login di halaman ExamPage
 
   useEffect(() => {
     const handleFocus = () => {
@@ -40,21 +43,19 @@ export default function LandingPage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [navigate])
 
-  // Load active exams
-  useEffect(() => {
-    const loadExams = async () => {
-      try {
-        const { data } = await supabase
-          .from('exams')
-          .select('id, title, duration, questions_count, description, is_active')
-          .eq('is_active', true)
-          .order('created_at', { ascending: false })
-          .limit(10)
-        setExams(data || [])
-      } catch (e) {}
-    }
-    loadExams()
-  }, [])
+  // Jadwal di-load hanya saat user klik tab Jadwal (hemat API)
+  const loadExams = async () => {
+    if (exams.length > 0) return // sudah loaded
+    try {
+      const { data } = await supabase
+        .from('exams')
+        .select('id, title, duration, questions_count, description, is_active')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(10)
+      setExams(data || [])
+    } catch (e) {}
+  }
 
   const getExamMeta = (exam) => { try { return JSON.parse(exam.description || '{}') } catch { return {} } }
 
@@ -64,6 +65,7 @@ export default function LandingPage() {
       label: 'Jadwal Ujian',
       color: 'bg-blue-500',
       lightColor: 'bg-blue-50',
+      onClick: () => { setActiveSection('jadwal'); loadExams() },
       svg: (
         <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5m-9-6h.008v.008H12v-.008ZM12 15h.008v.008H12V15Zm0 2.25h.008v.008H12v-.008ZM9.75 15h.008v.008H9.75V15Zm0 2.25h.008v.008H9.75v-.008ZM7.5 15h.008v.008H7.5V15Zm0 2.25h.008v.008H7.5v-.008Zm6.75-4.5h.008v.008h-.008v-.008Zm0 2.25h.008v.008h-.008V15Zm0 2.25h.008v.008h-.008v-.008Zm2.25-4.5h.008v.008H16.5v-.008Zm0 2.25h.008v.008H16.5V15Z" />
@@ -257,7 +259,7 @@ export default function LandingPage() {
           {menuItems.map((item) => (
             <button
               key={item.id}
-              onClick={() => setActiveSection(item.id)}
+              onClick={() => item.onClick ? item.onClick() : setActiveSection(item.id)}
               className="flex flex-col items-center gap-2 active:scale-95 transition-transform"
             >
               <div className={`w-14 h-14 ${item.color} rounded-2xl flex items-center justify-center shadow-md`}>
