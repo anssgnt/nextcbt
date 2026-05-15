@@ -28,6 +28,9 @@ export const AdminSettings = () => {
       examFinishMessage: 'Terima kasih telah mengerjakan ujian. Hasil akan diumumkan setelah semua peserta selesai.',
       showQuestionNumber: true,
       examThemeColor: '#2563eb',
+      tataTertib: '1. Siswa wajib hadir 15 menit sebelum ujian\n2. Dilarang membuka aplikasi lain saat ujian\n3. Dilarang bekerja sama dengan siswa lain\n4. Pastikan baterai HP terisi penuh\n5. Sync soal sebelum ujian dimulai',
+      tutorialPanduan: '1. Login menggunakan NIS\n2. Pilih ujian yang tersedia\n3. Klik Sync untuk download soal\n4. Masukkan token dari pengawas\n5. Kerjakan soal hingga selesai\n6. Klik Submit untuk mengirim jawaban',
+      pengumuman: '',
     }
   })
 
@@ -306,6 +309,46 @@ export const AdminSettings = () => {
                   <span className="text-sm font-medium text-gray-700">Tampilkan Nomor Soal</span>
                 </label>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Tata Tertib, Tutorial, Pengumuman */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Informasi Landing Page</CardTitle>
+            <CardDescription>Konten yang ditampilkan di halaman utama siswa</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Tata Tertib Ujian</label>
+              <textarea
+                value={settings.tataTertib}
+                onChange={(e) => handleChange('tataTertib', e.target.value)}
+                rows={5}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                placeholder="Tulis tata tertib ujian (1 baris per poin)..."
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Tutorial / Panduan</label>
+              <textarea
+                value={settings.tutorialPanduan}
+                onChange={(e) => handleChange('tutorialPanduan', e.target.value)}
+                rows={5}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                placeholder="Tulis panduan cara mengerjakan ujian (1 baris per langkah)..."
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Pengumuman</label>
+              <textarea
+                value={settings.pengumuman}
+                onChange={(e) => handleChange('pengumuman', e.target.value)}
+                rows={3}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                placeholder="Tulis pengumuman untuk siswa (kosongkan jika tidak ada)..."
+              />
             </div>
           </CardContent>
         </Card>
