@@ -42,19 +42,20 @@ export function ProfilePage() {
         {/* Hapus Sync */}
         <button
           onClick={() => {
-            if (confirm('Hapus semua data sync & status ujian? Anda perlu sync ulang dan bisa ujian lagi.')) {
+            if (confirm('Hapus data sync? Anda perlu sync ulang sebelum ujian.')) {
               const keys = Object.keys(localStorage).filter((k) =>
                 k.startsWith('exam_data_') || k.startsWith('answers_') || k.startsWith('pending_submit_') ||
-                k === 'synced_exams' || k === 'exam_versions' || k === 'completed_exams'
+                k === 'synced_exams' || k === 'exam_versions'
               )
               keys.forEach((k) => localStorage.removeItem(k))
-              alert('Data sync & status ujian dihapus. Silakan sync ulang.')
+              alert('Data sync dihapus. Silakan sync ulang.')
             }
           }}
           className="w-full mt-3 bg-gray-100 text-gray-600 py-3 rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-gray-200 transition text-sm"
         >
-          🔄 Reset Sync & Ujian
+          🔄 Reset Sync
         </button>
+        <p className="text-[10px] text-gray-400 text-center mt-1">Hanya menghapus soal offline. Status ujian dikontrol admin.</p>
       </div>
     </StudentLayout>
   )

@@ -20,12 +20,26 @@ export const ExamPage = () => {
   const [tokenError, setTokenError] = useState('')
   const [syncError, setSyncError] = useState(null)
   const [loadError, setLoadError] = useState(null)
-  const [completedExams] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('completed_exams') || '{}') } catch { return {} }
-  })
+  const [completedExams, setCompletedExams] = useState({})
   const isOnline = navigator.onLine
 
-  useEffect(() => { loadExams() }, [])
+  useEffect(() => { loadExams(); loadCompletedStatus() }, [])
+
+  // Cek status ujian dari server (siswa tidak bisa bypass)
+  const loadCompletedStatus = async () => {
+    if (!user?.id) return
+    try {
+      const { data } = await queuedFetch(
+        supabase.from('exam_sessions').select('exam_id').eq('student_id', user.id).eq('status', 'submitted')
+      )
+      const map = {}
+      ;(data || []).forEach((s) => { map[s.exam_id] = true })
+      setCompletedExams(map)
+    } catch {
+      // Fallback ke localStorage jika offline
+      try { setCompletedExams(JSON.parse(localStorage.getItem('completed_exams') || '{}')) } catch {}
+    }
+  }
 
   const loadExams = async () => {
     setLoading(true)
