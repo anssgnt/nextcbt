@@ -253,7 +253,7 @@ export default function LandingPage() {
         </button>
 
         {/* Menu Icons Grid */}
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-4 gap-4 mb-8">
           {menuItems.map((item) => (
             <button
               key={item.id}
@@ -268,8 +268,39 @@ export default function LandingPage() {
           ))}
         </div>
 
+        {/* Info Sekolah */}
+        <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100 mb-6">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center overflow-hidden shadow-sm border border-gray-200 flex-shrink-0">
+              {settings.logo ? (
+                <img src={settings.logo} alt="Logo" className="w-full h-full object-cover" />
+              ) : (
+                <BookOpen size={18} className="text-blue-600" />
+              )}
+            </div>
+            <div>
+              <p className="text-sm font-bold text-gray-800">{settings.schoolName}</p>
+              <p className="text-[11px] text-gray-500">{settings.schoolMotto}</p>
+            </div>
+          </div>
+          {(settings.schoolAddress || settings.schoolPhone || settings.schoolEmail) && (
+            <div className="space-y-1.5 text-xs text-gray-500 border-t border-gray-200 pt-3">
+              {settings.schoolAddress && <p>📍 {settings.schoolAddress}</p>}
+              {settings.schoolPhone && <p>📞 {settings.schoolPhone}</p>}
+              {settings.schoolEmail && <p>✉️ {settings.schoolEmail}</p>}
+            </div>
+          )}
+        </div>
+
+        {/* Powered by */}
+        <div className="text-center space-y-1">
+          <p className="text-[10px] text-gray-300 uppercase tracking-widest">Powered by</p>
+          <p className="text-sm font-bold text-gray-400">NextCBT</p>
+          <p className="text-[10px] text-gray-300">Platform Ujian Berbasis Komputer</p>
+        </div>
+
         {/* Footer */}
-        <p className="text-center text-gray-400 text-xs mt-10">
+        <p className="text-center text-gray-400 text-xs mt-6">
           © {new Date().getFullYear()} {settings.schoolName}
         </p>
       </div>
