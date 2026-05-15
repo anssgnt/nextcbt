@@ -517,6 +517,15 @@ export const AdminSchedule = () => {
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex gap-1">
+                              {/* Publish JSON */}
+                              <button
+                                onClick={() => handlePublish(exam)}
+                                disabled={publishing === exam.id}
+                                className="p-1.5 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 rounded text-xs font-semibold"
+                                title="Publish JSON"
+                              >
+                                {publishing === exam.id ? '...' : 'PUB'}
+                              </button>
                               {/* Toggle Aktif */}
                               <button
                                 onClick={async () => {
@@ -573,14 +582,6 @@ export const AdminSchedule = () => {
                                 className="p-1.5 text-orange-600 hover:bg-orange-50 rounded" title="Cetak Berita Acara"
                               >
                                 <FileText size={14} />
-                              </button>
-                              {/* Publish Ujian */}
-                              <button
-                                onClick={() => handlePublish(exam)}
-                                disabled={publishing === exam.id}
-                                className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded disabled:opacity-50" title="Publish Ujian (JSON)"
-                              >
-                                {publishing === exam.id ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
                               </button>
                               {/* Hapus */}
                               <button onClick={() => handleDelete(exam.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded" title="Hapus">
