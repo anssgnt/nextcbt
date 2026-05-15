@@ -9,7 +9,6 @@ export const StudentLogin = () => {
   const [nis, setNis] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
-  const [focused, setFocused] = useState(false)
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -38,50 +37,43 @@ export const StudentLogin = () => {
   const settings = JSON.parse(localStorage.getItem('cbt_settings') || '{}')
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-[#0f172a]">
-      {/* Animated background blobs */}
-      <div className="absolute inset-0">
-        <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] rounded-full bg-blue-600/20 blur-3xl animate-pulse" />
-        <div className="absolute bottom-[-20%] right-[-10%] w-[400px] h-[400px] rounded-full bg-purple-600/20 blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
-        <div className="absolute top-[40%] right-[20%] w-[300px] h-[300px] rounded-full bg-cyan-500/10 blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
-      </div>
-
-      {/* Grid pattern overlay */}
-      <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.1) 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+    <div className="min-h-screen bg-gradient-to-b from-blue-600 via-blue-500 to-blue-400 relative overflow-hidden">
+      {/* Decorative circles */}
+      <div className="absolute top-[-80px] right-[-60px] w-[250px] h-[250px] rounded-full bg-white/10" />
+      <div className="absolute bottom-[-100px] left-[-80px] w-[300px] h-[300px] rounded-full bg-white/10" />
+      <div className="absolute top-[30%] left-[-40px] w-[150px] h-[150px] rounded-full bg-blue-400/30" />
 
       {/* Content */}
       <div className="relative z-10 min-h-screen flex flex-col items-center justify-center p-5">
         {/* Logo & School */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg shadow-blue-500/25 mb-4 overflow-hidden">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-white shadow-lg mb-4 overflow-hidden">
             {settings.logo ? (
               <img src={settings.logo} alt="Logo" className="w-full h-full object-cover" />
             ) : (
-              <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <svg className="w-10 h-10 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5" />
               </svg>
             )}
           </div>
-          <h1 className="text-2xl font-bold text-white mb-1">{settings.schoolName || 'NextCBT'}</h1>
-          <p className="text-sm text-gray-400">{settings.schoolMotto || 'Ujian Berbasis Komputer'}</p>
+          <h1 className="text-2xl font-bold text-white">{settings.schoolName || 'NextCBT'}</h1>
+          <p className="text-blue-100 text-sm mt-1">{settings.schoolMotto || 'Ujian Berbasis Komputer'}</p>
         </div>
 
         {/* Login Card */}
         <div className="w-full max-w-sm">
-          <div className={`bg-white/[0.05] backdrop-blur-xl border rounded-3xl p-7 transition-all duration-300 ${focused ? 'border-blue-500/50 shadow-lg shadow-blue-500/10' : 'border-white/10'}`}>
-            {/* Greeting */}
+          <div className="bg-white rounded-3xl p-7 shadow-xl">
             <div className="mb-6">
-              <h2 className="text-xl font-bold text-white">Halo, Siswa! 👋</h2>
-              <p className="text-gray-400 text-sm mt-1">Masukkan NIS untuk memulai ujian</p>
+              <h2 className="text-xl font-bold text-gray-900">Halo, Siswa! 👋</h2>
+              <p className="text-gray-500 text-sm mt-1">Masukkan NIS untuk memulai</p>
             </div>
 
             <form onSubmit={handleLogin} className="space-y-5">
-              {/* NIS Input */}
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-2 uppercase tracking-wider">Nomor Induk Siswa</label>
-                <div className={`relative rounded-xl overflow-hidden transition-all ${focused ? 'ring-2 ring-blue-500/50' : ''}`}>
+                <label className="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wider">Nomor Induk Siswa</label>
+                <div className="relative">
                   <div className="absolute left-4 top-1/2 -translate-y-1/2">
-                    <svg className={`w-5 h-5 transition-colors ${focused ? 'text-blue-400' : 'text-gray-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
                     </svg>
                   </div>
@@ -89,33 +81,29 @@ export const StudentLogin = () => {
                     type="text"
                     value={nis}
                     onChange={(e) => { setNis(e.target.value); setError('') }}
-                    onFocus={() => setFocused(true)}
-                    onBlur={() => setFocused(false)}
                     placeholder="Ketik NIS kamu..."
-                    className="w-full bg-white/[0.07] border-0 text-white placeholder-gray-500 pl-12 pr-4 py-4 text-base focus:outline-none focus:bg-white/[0.1]"
+                    className="w-full bg-gray-50 border-2 border-gray-200 text-gray-900 placeholder-gray-400 pl-12 pr-4 py-4 rounded-xl text-base focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
                     autoComplete="off"
                     inputMode="numeric"
                   />
                 </div>
               </div>
 
-              {/* Error */}
               {error && (
-                <div className="flex items-center gap-2 px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-xl">
-                  <svg className="w-4 h-4 text-red-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl">
+                  <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
                   </svg>
-                  <span className="text-red-300 text-sm">{error}</span>
+                  <span className="text-red-600 text-sm">{error}</span>
                 </div>
               )}
 
-              {/* Submit */}
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full relative overflow-hidden group py-4 rounded-xl font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 disabled:opacity-50 transition-all active:scale-[0.98] shadow-lg shadow-blue-600/25"
+                className="w-full group py-4 rounded-xl font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition-all active:scale-[0.98] shadow-lg shadow-blue-600/30"
               >
-                <span className="relative z-10 flex items-center justify-center gap-2">
+                <span className="flex items-center justify-center gap-2">
                   {isLoading ? (
                     <>
                       <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -135,18 +123,15 @@ export const StudentLogin = () => {
                 </span>
               </button>
             </form>
-          </div>
 
-          {/* Help text */}
-          <p className="text-center text-gray-500 text-xs mt-5">
-            Lupa NIS? Hubungi wali kelas atau tata usaha
-          </p>
+            <p className="text-center text-gray-400 text-xs mt-5">
+              Lupa NIS? Hubungi wali kelas
+            </p>
+          </div>
         </div>
 
         {/* Footer */}
-        <div className="mt-10 text-center">
-          <p className="text-gray-600 text-xs">© {new Date().getFullYear()} {settings.schoolName || 'NextCBT'}</p>
-        </div>
+        <p className="text-blue-100/60 text-xs mt-8">© {new Date().getFullYear()} {settings.schoolName || 'NextCBT'}</p>
       </div>
     </div>
   )
