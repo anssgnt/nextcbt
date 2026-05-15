@@ -5,7 +5,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell, Legend
 } from 'recharts'
-import { Activity, Users, Database, AlertTriangle, CheckCircle, Clock, RefreshCw, Loader2 } from 'lucide-react'
+import { Activity, Users, Database, AlertTriangle, CheckCircle, Clock, RefreshCw, Loader2, Download } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { getCapacityService } from '../services/capacityService'
 
@@ -17,6 +17,10 @@ export const AdminMonitoring = () => {
   const [questionsInput, setQuestionsInput] = useState(50)
   const [syncStatus, setSyncStatus] = useState({ pending: 0, failed: 0, completed: 0 })
   const [refreshing, setRefreshing] = useState(false)
+  const [syncedStudents, setSyncedStudents] = useState([])
+  const [totalStudents, setTotalStudents] = useState(0)
+  const [syncPercentage, setSyncPercentage] = useState(0)
+  const [loadingTable, setLoadingTable] = useState(false)
 
   useEffect(() => {
     loadMonitoringData()
@@ -49,6 +53,9 @@ export const AdminMonitoring = () => {
         completed: completedSync || 0,
       })
 
+      // Load synced students
+      await loadSyncedStudents(studentCount || 0)
+
       // Capacity report
       const capacityService = getCapacityService()
       setCapacityReport(capacityService.generateReport(studentInput, questionsInput))
@@ -56,6 +63,64 @@ export const AdminMonitoring = () => {
       console.error('Failed to load monitoring data:', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadSyncedStudents = async (total) => {
+    setLoadingTable(true)
+    try {
+      setTotalStudents(total)
+
+      // Get unique students yang sudah sync (completed)
+      const { data: syncedData, error } = await supabase
+        .from('sync_queue')
+        .select('student_id, updated_at')
+        .eq('status', 'completed')
+        .order('updated_at', { ascending: false })
+
+      if (error) throw error
+
+      // Get unique student IDs
+      const uniqueStudentIds = [...new Set(syncedData?.map(s => s.student_id) || [])]
+
+      // Get student details
+      const { data: students, error: studentError } = await supabase
+        .from('students')
+        .select('id, name, class_id')
+        .in('id', uniqueStudentIds)
+
+      if (studentError) throw studentError
+
+      // Get class names
+      const classIds = [...new Set(students?.map(s => s.class_id) || [])]
+      const { data: classes } = await supabase
+        .from('classes')
+        .select('id, name')
+        .in('id', classIds)
+
+      const classMap = {}
+      classes?.forEach(c => {
+        classMap[c.id] = c.name
+      })
+
+      // Combine data
+      const syncedList = students?.map(student => {
+        const syncRecord = syncedData.find(s => s.student_id === student.id)
+        return {
+          id: student.id,
+          name: student.name,
+          class: classMap[student.class_id] || '-',
+          lastSync: syncRecord?.updated_at ? new Date(syncRecord.updated_at).toLocaleString('id-ID') : '-',
+          syncDate: syncRecord?.updated_at ? new Date(syncRecord.updated_at).toLocaleDateString('id-ID') : '-',
+        }
+      }) || []
+
+      setSyncedStudents(syncedList)
+      setSyncPercentage(total > 0 ? Math.round((uniqueStudentIds.length / total) * 100) : 0)
+    } catch (err) {
+      console.error('Failed to load synced students:', err)
+    } finally {
+      setLoadingTable(false)
     }
   }
 
@@ -68,6 +133,35 @@ export const AdminMonitoring = () => {
     setRefreshing(true)
     await loadMonitoringData()
     setRefreshing(false)
+  }
+
+  const handleExportCSV = () => {
+    const headers = ['No', 'Nama Siswa', 'Kelas', 'Tanggal Sync', 'Waktu Sync']
+    const rows = syncedStudents.map((student, idx) => [
+      idx + 1,
+      student.name,
+      student.class,
+      student.syncDate,
+      student.lastSync,
+    ])
+
+    const csvContent = [
+      ['LAPORAN SISWA YANG SUDAH SYNC'],
+      [`Total Siswa: ${totalStudents}`, `Sudah Sync: ${syncedStudents.length}`, `Persentase: ${syncPercentage}%`],
+      [`Tanggal Export: ${new Date().toLocaleString('id-ID')}`],
+      [],
+      headers,
+      ...rows,
+    ]
+      .map(row => row.map(cell => `"${cell}"`).join(','))
+      .join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', `laporan-sync-${new Date().toISOString().split('T')[0]}.csv`)
+    link.click()
   }
 
   // Chart data
@@ -298,6 +392,80 @@ export const AdminMonitoring = () => {
                     </ul>
                   </div>
                 )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Laporan Siswa Sync */}
+        <Card className="mt-6">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-base">Laporan Siswa yang Sudah Sync</CardTitle>
+              <CardDescription>Daftar siswa dengan status sync completed</CardDescription>
+            </div>
+            <button
+              onClick={handleExportCSV}
+              disabled={syncedStudents.length === 0}
+              className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Download size={16} />
+              Export CSV
+            </button>
+          </CardHeader>
+          <CardContent>
+            {/* Summary Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <p className="text-xs text-blue-600 font-medium">Total Siswa</p>
+                <p className="text-2xl font-bold text-blue-900">{totalStudents}</p>
+              </div>
+              <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                <p className="text-xs text-green-600 font-medium">Sudah Sync</p>
+                <p className="text-2xl font-bold text-green-900">{syncedStudents.length}</p>
+              </div>
+              <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+                <p className="text-xs text-purple-600 font-medium">Persentase Sync</p>
+                <p className="text-2xl font-bold text-purple-900">{syncPercentage}%</p>
+              </div>
+            </div>
+
+            {/* Table */}
+            {loadingTable ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 size={24} className="animate-spin text-blue-600" />
+              </div>
+            ) : syncedStudents.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200 bg-gray-50">
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">No</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Nama Siswa</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Kelas</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Tanggal Sync</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Waktu Sync</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {syncedStudents.map((student, idx) => (
+                      <tr key={student.id} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="px-4 py-3 text-gray-600">{idx + 1}</td>
+                        <td className="px-4 py-3 font-medium text-gray-900">{student.name}</td>
+                        <td className="px-4 py-3 text-gray-600">{student.class}</td>
+                        <td className="px-4 py-3 text-gray-600">{student.syncDate}</td>
+                        <td className="px-4 py-3 text-gray-600 text-xs">{student.lastSync}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <CheckCircle size={32} className="mx-auto mb-2 text-gray-400" />
+                  <p className="text-gray-500">Belum ada siswa yang sync</p>
+                </div>
               </div>
             )}
           </CardContent>

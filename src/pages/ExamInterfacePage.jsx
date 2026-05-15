@@ -1,140 +1,98 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Button, Card, Modal, Toast } from '../components'
 import { useExamStore, useAuthStore } from '../store'
 import { useExamTimer, useTabVisibility, useOnlineStatus } from '../hooks/useExam'
 import { formatTime, debounce } from '../utils/helpers'
-import { Clock, AlertCircle, Wifi, WifiOff } from 'lucide-react'
+import { Clock, Wifi, WifiOff, List } from 'lucide-react'
 
 export const ExamInterfacePage = () => {
   const { examId } = useParams()
   const navigate = useNavigate()
   const user = useAuthStore((state) => state.user)
   const {
-    currentExam,
-    setCurrentExam,
-    answers,
-    setAnswer,
-    currentQuestionIndex,
-    setCurrentQuestionIndex,
-    markedQuestions,
-    toggleMarkQuestion,
-    setSessionId,
-    sessionId,
+    currentExam, setCurrentExam,
+    answers, setAnswer,
+    currentQuestionIndex, setCurrentQuestionIndex,
+    markedQuestions, toggleMarkQuestion,
+    setSessionId, sessionId,
   } = useExamStore()
 
   const [questions, setQuestions] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [showWarning, setShowWarning] = useState(false)
   const [showSubmitModal, setShowSubmitModal] = useState(false)
+  const [showNav, setShowNav] = useState(false)
   const [toast, setToast] = useState(null)
   const isOnline = useOnlineStatus()
 
   const { timeRemaining, isTimeUp } = useExamTimer(currentExam?.duration)
 
-  useTabVisibility(() => {
-    setShowWarning(true)
-  })
+  useTabVisibility(() => setShowWarning(true))
 
+  useEffect(() => { if (isTimeUp) handleSubmitExam() }, [isTimeUp])
+
+  // Load from localStorage
   useEffect(() => {
-    if (isTimeUp) {
-      handleSubmitExam()
-    }
-  }, [isTimeUp])
-
-  // Load exam from localStorage (already synced from ExamPage)
-  useEffect(() => {
-    const loadExam = () => {
-      try {
-        const cached = localStorage.getItem(`exam_data_${examId}`)
-        if (!cached) {
-          setToast({ type: 'error', message: 'Soal belum di-sync. Kembali ke daftar ujian.' })
-          setTimeout(() => navigate('/student/exams'), 2000)
-          return
-        }
-
-        const examData = JSON.parse(cached)
-        setCurrentExam(examData.exam)
-
-        // Shuffle if enabled
-        let q = examData.questions || []
-        if (examData.meta?.shuffle) {
-          q = [...q].sort(() => Math.random() - 0.5)
-        }
-        setQuestions(q)
-
-        // Generate session ID locally
-        if (!sessionId) {
-          setSessionId(`session_${examId}_${Date.now()}`)
-        }
-      } catch (err) {
-        setToast({ type: 'error', message: 'Gagal memuat soal' })
-      } finally {
-        setIsLoading(false)
+    try {
+      const cached = localStorage.getItem(`exam_data_${examId}`)
+      if (!cached) {
+        setToast({ type: 'error', message: 'Soal belum di-sync' })
+        setTimeout(() => navigate('/student/exams'), 2000)
+        return
       }
-    }
-
-    loadExam()
+      const examData = JSON.parse(cached)
+      setCurrentExam(examData.exam)
+      let q = examData.questions || []
+      if (examData.meta?.shuffle) q = [...q].sort(() => Math.random() - 0.5)
+      setQuestions(q)
+      if (!sessionId) setSessionId(`session_${examId}_${Date.now()}`)
+    } catch { setToast({ type: 'error', message: 'Gagal memuat soal' }) }
+    finally { setIsLoading(false) }
   }, [examId])
 
-  const debouncedSaveAnswer = debounce(async (qId, answer) => {
-    // Save to localStorage for offline persistence
+  const debouncedSave = debounce((qId, answer) => {
     const key = `answers_${examId}`
     const saved = JSON.parse(localStorage.getItem(key) || '{}')
     saved[qId] = answer
     localStorage.setItem(key, JSON.stringify(saved))
-  }, 2000)
+  }, 1000)
 
   const handleAnswerChange = (questionId, answer) => {
     setAnswer(questionId, answer)
-    debouncedSaveAnswer(questionId, answer)
+    debouncedSave(questionId, answer)
   }
 
   const handleSubmitExam = async () => {
     try {
-      // Collect answers from state + localStorage
       const savedAnswers = JSON.parse(localStorage.getItem(`answers_${examId}`) || '{}')
       const allAnswers = { ...savedAnswers, ...answers }
-
       if (isOnline) {
-        // Submit to Supabase
         try {
           const { queuedFetch } = await import('../utils/requestQueue')
           const { supabase } = await import('../lib/supabase')
-          await queuedFetch(
-            supabase.from('exam_sessions').insert({
-              student_id: user?.id,
-              exam_id: examId,
-              status: 'submitted',
-              score: calculateScore(allAnswers),
-              submitted_at: new Date().toISOString(),
-            })
-          )
-        } catch (e) {
-          // Save locally if submit fails
-          localStorage.setItem(`pending_submit_${examId}`, JSON.stringify(allAnswers))
-        }
+          await queuedFetch(supabase.from('exam_sessions').insert({
+            student_id: user?.id, exam_id: examId, status: 'submitted',
+            score: calculateScore(allAnswers), submitted_at: new Date().toISOString(),
+          }))
+        } catch { localStorage.setItem(`pending_submit_${examId}`, JSON.stringify(allAnswers)) }
       } else {
-        // Save for later sync
         localStorage.setItem(`pending_submit_${examId}`, JSON.stringify(allAnswers))
         setToast({ type: 'info', message: 'Jawaban disimpan. Akan dikirim saat online.' })
       }
-
-      // Cleanup
       localStorage.removeItem(`answers_${examId}`)
       navigate('/student/exams')
-    } catch (error) {
-      setToast({ type: 'error', message: 'Gagal submit' })
-    }
+    } catch { setToast({ type: 'error', message: 'Gagal submit' }) }
   }
 
-  // Simple scoring: compare answers with correct_answer
   const calculateScore = (answersMap) => {
     let correct = 0
     questions.forEach((q) => {
-      const userAnswer = answersMap[q.id]
-      if (userAnswer && q.correct_answer && userAnswer === q.correct_answer) {
-        correct++
+      const a = answersMap[q.id]
+      if (a && q.correct_answer) {
+        if (Array.isArray(a)) {
+          if (a.sort().join(',') === q.correct_answer) correct++
+        } else if (a === q.correct_answer) correct++
       }
     })
     return questions.length > 0 ? Math.round((correct / questions.length) * 100) : 0
@@ -143,22 +101,18 @@ export const ExamInterfacePage = () => {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading exam...</p>
-        </div>
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
       </div>
     )
   }
 
   if (!currentExam || questions.length === 0) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Card className="text-center">
-          <AlertCircle size={48} className="text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-bold mb-2">Exam not found</h2>
-          <Button onClick={() => navigate('/student/exams')}>Back to Exams</Button>
-        </Card>
+      <div className="flex items-center justify-center min-h-screen p-4">
+        <div className="text-center">
+          <p className="text-lg font-bold text-gray-800 mb-2">Soal tidak ditemukan</p>
+          <Button onClick={() => navigate('/student/exams')}>Kembali</Button>
+        </div>
       </div>
     )
   }
@@ -168,277 +122,195 @@ export const ExamInterfacePage = () => {
   const isMarked = markedQuestions.has(currentQuestion?.id)
   const answeredCount = Object.keys(answers).length
 
+  // Render question based on type (support both old & new naming)
   const renderQuestion = () => {
-    switch (currentQuestion.type) {
-      case 'multiple_choice':
-        return (
-          <div className="space-y-3">
-            {currentQuestion.options?.map((option) => (
-              <label key={option.id} className="flex items-center p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-primary hover:bg-blue-50 transition-all">
-                <input
-                  type="radio"
-                  name={`question-${currentQuestion.id}`}
-                  value={option.id}
-                  checked={currentAnswer === option.id}
-                  onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
-                  className="w-4 h-4 text-primary"
-                />
-                <span className="ml-3 text-gray-900">{option.option_text}</span>
-              </label>
-            ))}
-          </div>
-        )
+    const type = currentQuestion.type
+    const opts = currentQuestion.options || []
 
-      case 'multiple_choice_complex':
-        return (
-          <div className="space-y-3">
-            <p className="text-sm text-gray-600 mb-4">Pilih semua jawaban yang benar:</p>
-            {currentQuestion.options?.map((option) => (
-              <label key={option.id} className="flex items-center p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-primary hover:bg-blue-50 transition-all">
-                <input
-                  type="checkbox"
-                  value={option.id}
-                  checked={(currentAnswer || []).includes(option.id)}
-                  onChange={(e) => {
-                    const selected = currentAnswer || []
-                    const newSelected = e.target.checked
-                      ? [...selected, option.id]
-                      : selected.filter(id => id !== option.id)
-                    handleAnswerChange(currentQuestion.id, newSelected)
-                  }}
-                  className="w-4 h-4 text-primary"
-                />
-                <span className="ml-3 text-gray-900">{option.option_text}</span>
-              </label>
-            ))}
-          </div>
-        )
-
-      case 'true_false':
-        return (
-          <div className="space-y-3">
-            {['Benar', 'Salah'].map((option) => (
-              <label key={option} className="flex items-center p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-primary hover:bg-blue-50 transition-all">
-                <input
-                  type="radio"
-                  name={`question-${currentQuestion.id}`}
-                  value={option}
-                  checked={currentAnswer === option}
-                  onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
-                  className="w-4 h-4 text-primary"
-                />
-                <span className="ml-3 text-gray-900">{option}</span>
-              </label>
-            ))}
-          </div>
-        )
-
-      case 'matching':
-        return (
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="font-semibold mb-3">Kolom A</p>
-              <div className="space-y-2">
-                {currentQuestion.leftItems?.map((item, idx) => (
-                  <div key={idx} className="p-3 bg-gray-100 rounded">{item}</div>
-                ))}
-              </div>
-            </div>
-            <div>
-              <p className="font-semibold mb-3">Kolom B</p>
-              <div className="space-y-2">
-                {currentQuestion.rightItems?.map((item, idx) => (
-                  <select key={idx} className="w-full p-2 border border-gray-300 rounded">
-                    <option>Pilih pasangan</option>
-                    {currentQuestion.leftItems?.map((left, lidx) => (
-                      <option key={lidx}>{left}</option>
-                    ))}
-                  </select>
-                ))}
-              </div>
-            </div>
-          </div>
-        )
-
-      case 'short_answer':
-        return (
-          <textarea
-            value={currentAnswer || ''}
-            onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
-            placeholder="Ketik jawaban Anda di sini..."
-            className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-blue-100 resize-none"
-            rows={6}
-          />
-        )
-
-      default:
-        return <p className="text-gray-600">Tipe soal tidak dikenali</p>
+    // Pilihan Ganda
+    if (type === 'pilihan_ganda' || type === 'multiple_choice') {
+      return (
+        <div className="space-y-2">
+          {opts.map((opt) => (
+            <label key={opt.id} className={`flex items-center p-3 border-2 rounded-xl cursor-pointer transition ${currentAnswer === opt.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
+              <input type="radio" name={`q-${currentQuestion.id}`} value={opt.id} checked={currentAnswer === opt.id} onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)} className="w-4 h-4 text-blue-600" />
+              <span className="ml-3 text-sm text-gray-900">{opt.text || opt.option_text}</span>
+            </label>
+          ))}
+        </div>
+      )
     }
+
+    // Pilihan Ganda Kompleks
+    if (type === 'pilihan_ganda_kompleks' || type === 'multiple_choice_complex') {
+      return (
+        <div className="space-y-2">
+          <p className="text-xs text-gray-500 mb-2">Pilih semua jawaban yang benar:</p>
+          {opts.map((opt) => (
+            <label key={opt.id} className={`flex items-center p-3 border-2 rounded-xl cursor-pointer transition ${(currentAnswer || []).includes(opt.id) ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
+              <input type="checkbox" value={opt.id} checked={(currentAnswer || []).includes(opt.id)} onChange={(e) => {
+                const sel = currentAnswer || []
+                const next = e.target.checked ? [...sel, opt.id] : sel.filter((x) => x !== opt.id)
+                handleAnswerChange(currentQuestion.id, next)
+              }} className="w-4 h-4 text-blue-600 rounded" />
+              <span className="ml-3 text-sm text-gray-900">{opt.text || opt.option_text}</span>
+            </label>
+          ))}
+        </div>
+      )
+    }
+
+    // Benar / Salah
+    if (type === 'benar_salah' || type === 'true_false') {
+      return (
+        <div className="space-y-2">
+          {['Benar', 'Salah'].map((opt) => (
+            <label key={opt} className={`flex items-center p-3 border-2 rounded-xl cursor-pointer transition ${currentAnswer === opt ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
+              <input type="radio" name={`q-${currentQuestion.id}`} value={opt} checked={currentAnswer === opt} onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)} className="w-4 h-4 text-blue-600" />
+              <span className="ml-3 text-sm text-gray-900">{opt}</span>
+            </label>
+          ))}
+        </div>
+      )
+    }
+
+    // Menjodohkan
+    if (type === 'menjodohkan' || type === 'matching') {
+      const pairs = currentQuestion.matching_pairs || []
+      return (
+        <div className="space-y-2">
+          <p className="text-xs text-gray-500 mb-2">Jodohkan kolom kiri dengan kanan:</p>
+          {pairs.map((pair, idx) => (
+            <div key={idx} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
+              <span className="text-sm font-medium w-1/3">{pair.left}</span>
+              <span className="text-gray-400">→</span>
+              <select
+                value={(currentAnswer || {})[idx] || ''}
+                onChange={(e) => {
+                  const ans = { ...(currentAnswer || {}), [idx]: e.target.value }
+                  handleAnswerChange(currentQuestion.id, ans)
+                }}
+                className="flex-1 px-2 py-1.5 border border-gray-300 rounded-lg text-sm"
+              >
+                <option value="">Pilih</option>
+                {pairs.map((p, i) => <option key={i} value={p.right}>{p.right}</option>)}
+              </select>
+            </div>
+          ))}
+        </div>
+      )
+    }
+
+    // Uraian Singkat
+    if (type === 'uraian_singkat' || type === 'short_answer') {
+      return (
+        <textarea
+          value={currentAnswer || ''}
+          onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
+          placeholder="Ketik jawaban..."
+          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 resize-none text-sm"
+          rows={4}
+        />
+      )
+    }
+
+    return <p className="text-sm text-red-500">Tipe soal "{type}" tidak dikenali</p>
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="sticky top-0 bg-white border-b border-gray-200 shadow-sm z-40">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">{currentExam.title}</h1>
-            <p className="text-sm text-gray-600">Question {currentQuestionIndex + 1} of {questions.length}</p>
+      <div className="sticky top-0 bg-white border-b border-gray-200 shadow-sm z-40 px-4 py-3">
+        <div className="flex items-center justify-between">
+          <div className="min-w-0">
+            <h1 className="text-sm font-bold text-gray-900 truncate">{currentExam.title}</h1>
+            <p className="text-xs text-gray-500">Soal {currentQuestionIndex + 1} dari {questions.length}</p>
           </div>
-          <div className="flex items-center gap-4">
-            <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
-              timeRemaining < 300 ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700'
-            }`}>
-              <Clock size={20} />
-              <span className="font-mono font-bold">{formatTime(timeRemaining)}</span>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-mono font-bold ${timeRemaining < 300 ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700'}`}>
+              <Clock size={14} />
+              {formatTime(timeRemaining)}
             </div>
-            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
-              isOnline ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'
-            }`}>
-              {isOnline ? (
-                <>
-                  <Wifi size={18} />
-                  <span className="text-sm font-medium">Online</span>
-                </>
-              ) : (
-                <>
-                  <WifiOff size={18} />
-                  <span className="text-sm font-medium">Offline</span>
-                </>
-              )}
-            </div>
-            {!isOnline && (
-              <div className="px-3 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium">
-                Offline Mode
-              </div>
-            )}
+            <button onClick={() => setShowNav(!showNav)} className={`p-2 rounded-lg transition ${showNav ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+              <List size={18} />
+            </button>
           </div>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Main Content */}
-        <div className="lg:col-span-3">
-          <Card className="mb-6">
-            <div className="mb-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">{currentQuestion.question_text}</h2>
-              {currentQuestion.image_url && (
-                <img
-                  src={currentQuestion.image_url}
-                  alt="Question"
-                  className="max-w-full h-auto rounded-lg mb-4"
-                />
-              )}
-            </div>
-
-            {renderQuestion()}
-          </Card>
-
-          {/* Navigation */}
-          <div className="flex gap-3">
-            <Button
-              variant="secondary"
-              onClick={() => setCurrentQuestionIndex(Math.max(0, currentQuestionIndex - 1))}
-              disabled={currentQuestionIndex === 0}
-            >
-              Previous
-            </Button>
-            <Button
-              variant={isMarked ? 'danger' : 'secondary'}
-              onClick={() => toggleMarkQuestion(currentQuestion.id)}
-            >
-              {isMarked ? 'Unmark' : 'Mark'}
-            </Button>
-            <Button
-              onClick={() => setCurrentQuestionIndex(Math.min(questions.length - 1, currentQuestionIndex + 1))}
-              disabled={currentQuestionIndex === questions.length - 1}
-            >
-              Next
-            </Button>
-            <Button
-              variant="danger"
-              onClick={() => setShowSubmitModal(true)}
-              className="ml-auto"
-            >
-              Submit Exam
-            </Button>
+      {/* Question Navigation (toggle) */}
+      {showNav && (
+        <div className="bg-white border-b border-gray-200 px-4 py-3">
+          <div className="grid grid-cols-10 gap-1.5">
+            {questions.map((q, idx) => (
+              <button key={q.id} onClick={() => { setCurrentQuestionIndex(idx); setShowNav(false) }}
+                className={`aspect-square rounded-lg text-xs font-medium transition ${
+                  idx === currentQuestionIndex ? 'bg-blue-600 text-white' :
+                  answers[q.id] ? 'bg-green-100 text-green-700' :
+                  markedQuestions.has(q.id) ? 'bg-yellow-100 text-yellow-700' :
+                  'bg-gray-100 text-gray-600'
+                }`}
+              >{idx + 1}</button>
+            ))}
+          </div>
+          <div className="flex gap-4 mt-2 text-[10px] text-gray-500">
+            <span>🟢 Dijawab: {answeredCount}</span>
+            <span>🟡 Ditandai: {markedQuestions.size}</span>
+            <span>⚪ Belum: {questions.length - answeredCount}</span>
           </div>
         </div>
+      )}
 
-        {/* Question Palette */}
-        <div className="lg:col-span-1">
-          <Card>
-            <h3 className="font-semibold text-gray-900 mb-4">Questions</h3>
-            <div className="grid grid-cols-5 gap-2">
-              {questions.map((q, idx) => (
-                <button
-                  key={q.id}
-                  onClick={() => setCurrentQuestionIndex(idx)}
-                  className={`aspect-square rounded-lg font-medium text-sm transition-all ${
-                    idx === currentQuestionIndex
-                      ? 'bg-primary text-white'
-                      : answers[q.id]
-                      ? 'bg-green-100 text-green-700'
-                      : markedQuestions.has(q.id)
-                      ? 'bg-yellow-100 text-yellow-700'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {idx + 1}
-                </button>
-              ))}
-            </div>
-            <div className="mt-4 space-y-2 text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-green-100 rounded"></div>
-                <span className="text-gray-600">Answered: {answeredCount}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-yellow-100 rounded"></div>
-                <span className="text-gray-600">Marked: {markedQuestions.size}</span>
-              </div>
-            </div>
-          </Card>
+      {/* Question Content */}
+      <div className="px-4 py-4">
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-4">
+          <p className="text-sm font-semibold text-gray-900 mb-4">{currentQuestion.question_text}</p>
+          {currentQuestion.image_url && (
+            <img src={currentQuestion.image_url} alt="" className="max-w-full rounded-lg mb-4" />
+          )}
+          {renderQuestion()}
+        </div>
+
+        {/* Navigation Buttons */}
+        <div className="flex gap-2">
+          <button onClick={() => setCurrentQuestionIndex(Math.max(0, currentQuestionIndex - 1))} disabled={currentQuestionIndex === 0} className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium disabled:opacity-40">
+            Sebelumnya
+          </button>
+          <button onClick={() => toggleMarkQuestion(currentQuestion.id)} className={`px-4 py-2.5 rounded-xl text-sm font-medium ${isMarked ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600'}`}>
+            {isMarked ? '★' : '☆'}
+          </button>
+          {currentQuestionIndex < questions.length - 1 ? (
+            <button onClick={() => setCurrentQuestionIndex(currentQuestionIndex + 1)} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium">
+              Selanjutnya
+            </button>
+          ) : (
+            <button onClick={() => setShowSubmitModal(true)} className="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-sm font-medium">
+              Selesai
+            </button>
+          )}
         </div>
       </div>
 
       {/* Modals */}
-      <Modal isOpen={showWarning} onClose={() => setShowWarning(false)} title="Warning">
+      <Modal isOpen={showWarning} onClose={() => setShowWarning(false)} title="Peringatan">
         <div className="space-y-4">
-          <p className="text-gray-700">You switched tabs. Please stay focused on the exam.</p>
-          <Button onClick={() => setShowWarning(false)} size="lg">
-            Continue Exam
-          </Button>
+          <p className="text-gray-700 text-sm">Anda berpindah tab. Tetap fokus pada ujian.</p>
+          <Button onClick={() => setShowWarning(false)}>Lanjutkan</Button>
         </div>
       </Modal>
 
-      <Modal isOpen={showSubmitModal} onClose={() => setShowSubmitModal(false)} title="Submit Exam">
+      <Modal isOpen={showSubmitModal} onClose={() => setShowSubmitModal(false)} title="Selesai Ujian">
         <div className="space-y-4">
-          <p className="text-gray-700">Are you sure you want to submit? You have answered {answeredCount} of {questions.length} questions.</p>
-          {!isOnline && (
-            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <p className="text-sm text-yellow-800">
-                You are offline. Your submission will be queued and synced when you go online.
-              </p>
-            </div>
-          )}
+          <p className="text-gray-700 text-sm">Yakin ingin mengumpulkan? Dijawab {answeredCount} dari {questions.length} soal.</p>
+          {!isOnline && <p className="text-xs text-yellow-700 bg-yellow-50 p-2 rounded-lg">Anda offline. Jawaban akan dikirim saat online.</p>}
           <div className="flex gap-3">
-            <Button variant="secondary" onClick={() => setShowSubmitModal(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSubmitExam}>Submit</Button>
+            <Button variant="secondary" onClick={() => setShowSubmitModal(false)}>Batal</Button>
+            <Button onClick={handleSubmitExam}>Kumpulkan</Button>
           </div>
         </div>
       </Modal>
 
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
-      )}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   )
 }
-
