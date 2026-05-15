@@ -193,9 +193,19 @@ export const ExamInterfacePage = () => {
       return (
         <div className="grid grid-cols-2 gap-3">
           {['Benar', 'Salah'].map((opt) => (
-            <label key={opt} className={`flex items-center justify-center p-4 border-2 rounded-xl cursor-pointer transition text-center ${currentAnswer === opt ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
+            <label key={opt} className={`flex items-center justify-center p-5 border-2 rounded-xl cursor-pointer transition text-center ${
+              currentAnswer === opt
+                ? opt === 'Benar'
+                  ? 'border-green-500 bg-green-100 shadow-md'
+                  : 'border-red-500 bg-red-100 shadow-md'
+                : 'border-gray-200 hover:border-gray-300'
+            }`}>
               <input type="radio" name={`q-${currentQuestion.id}`} value={opt} checked={currentAnswer === opt} onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)} className="sr-only" />
-              <span className={`text-sm font-medium ${currentAnswer === opt ? 'text-blue-700' : 'text-gray-700'}`}>{opt}</span>
+              <span className={`text-base font-bold ${
+                currentAnswer === opt
+                  ? opt === 'Benar' ? 'text-green-700' : 'text-red-700'
+                  : 'text-gray-600'
+              }`}>{opt === 'Benar' ? '✓ Benar' : '✗ Salah'}</span>
             </label>
           ))}
         </div>
