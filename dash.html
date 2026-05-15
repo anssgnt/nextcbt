@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SMP Negeri 1 - CBT Online</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f7fa;
+            max-width: 430px;
+            margin: 0 auto;
+            padding-bottom: 80px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+            color: white;
+            padding: 20px 20px 30px;
+            position: relative;
+        }
+
+        .header-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .school-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .school-logo {
+            width: 50px;
+            height: 50px;
+            background: white;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .school-name h1 {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 2px;
+        }
+
+        .school-tagline {
+            font-size: 13px;
+            opacity: 0.9;
+        }
+
+        .notification {
+            position: relative;
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .notification::after {
+            content: '';
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 8px;
+            height: 8px;
+            background: #ef4444;
+            border-radius: 50%;
+            border: 2px solid #2563eb;
+        }
+
+        .hero-card {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            border-radius: 20px;
+            padding: 24px;
+            margin: 20px;
+            margin-top: -20px;
+            box-shadow: 0 10px 30px rgba(37, 99, 235, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 2;
+        }
+
+        .hero-greeting {
+            font-size: 16px;
+            margin-bottom: 8px;
+            opacity: 0.95;
+        }
+
+        .hero-title {
+            font-size: 36px;
+            font-weight: 800;
+            margin-bottom: 8px;
+            color: white;
+        }
+
+        .hero-subtitle {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .hero-description {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+
+        .btn-start {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: white;
+            color: #2563eb;
+            padding: 14px 28px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 15px;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+        }
+
+        .btn-start:hover {
+            transform: translateY(-2px);
+        }
+
+        .hero-illustration {
+            position: absolute;
+            right: -20px;
+            bottom: -20px;
+            width: 280px;
+            height: 280px;
+            opacity: 0.15;
+            pointer-events: none;
+        }
+
+        .container {
+            padding: 0 20px;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        .link-all {
+            color: #2563eb;
+            font-size: 14px;
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+        .menu-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .menu-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .menu-item:hover {
+            transform: translateY(-4px);
+        }
+
+        .menu-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        .menu-icon.blue { background: #3b82f6; }
+        .menu-icon.green { background: #10b981; }
+        .menu-icon.purple { background: #8b5cf6; }
+        .menu-icon.orange { background: #f59e0b; }
+        .menu-icon.pink { background: #ec4899; }
+        .menu-icon.teal { background: #14b8a6; }
+        .menu-icon.yellow { background: #eab308; }
+
+        .menu-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #1e293b;
+            text-align: center;
+        }
+
+        .upcoming-exam {
+            background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 32px;
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .upcoming-exam:hover {
+            transform: translateY(-2px);
+        }
+
+        .exam-icon {
+            width: 60px;
+            height: 60px;
+            background: white;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            flex-shrink: 0;
+        }
+
+        .exam-info {
+            flex: 1;
+        }
+
+        .exam-label {
+            color: #059669;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .exam-subject {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 4px;
+        }
+
+        .exam-datetime {
+            font-size: 13px;
+            color: #64748b;
+            margin-bottom: 2px;
+        }
+
+        .exam-badge {
+            display: inline-block;
+            background: #10b981;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .announcements {
+            margin-bottom: 32px;
+        }
+
+        .announcement-item {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+
+        .announcement-item:hover {
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+            transform: translateX(4px);
+        }
+
+        .announcement-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+
+        .announcement-icon.blue { background: #dbeafe; }
+        .announcement-icon.orange { background: #fed7aa; }
+        .announcement-icon.green { background: #d1fae5; }
+
+        .announcement-content {
+            flex: 1;
+        }
+
+        .announcement-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 4px;
+        }
+
+        .announcement-meta {
+            font-size: 12px;
+            color: #94a3b8;
+        }
+
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            max-width: 430px;
+            background: white;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-around;
+            padding: 12px 0;
+            box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            color: #94a3b8;
+            font-size: 24px;
+            transition: color 0.2s;
+        }
+
+        .nav-item.active {
+            color: #2563eb;
+        }
+
+        .nav-label {
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        @media (max-width: 430px) {
+            body {
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-top">
+            <div class="school-info">
+                <div class="school-logo">🏫</div>
+                <div class="school-name">
+                    <h1>SMP NEGERI 1</h1>
+                    <div class="school-tagline">Cerdas, Berkarakter, Berprestasi</div>
+                </div>
+            </div>
+            <div class="notification">🔔</div>
+        </div>
+    </div>
+
+    <div class="hero-card">
+        <div class="hero-content">
+            <div class="hero-greeting">Selamat Datang 👋🏻</div>
+            <div class="hero-title">CBT Online</div>
+            <div class="hero-subtitle">Siap Ujian, Siap Prestasi!</div>
+            <div class="hero-description">Ujian jadi lebih mudah, aman,<br>dan terpercaya.</div>
+            <button class="btn-start" onclick="alert('Memulai ujian...')">
+                Mulai Ujian
+                <span>→</span>
+            </button>
+        </div>
+        <div class="hero-illustration">💻📝✅</div>
+    </div>
+
+    <div class="container">
+        <div class="section-header">
+            <h2 class="section-title">Menu Cepat</h2>
+            <a href="#" class="link-all">Lihat Semua</a>
+        </div>
+
+        <div class="menu-grid">
+            <div class="menu-item" onclick="alert('Jadwal Ujian')">
+                <div class="menu-icon blue">📅</div>
+                <div class="menu-label">Jadwal<br>Ujian</div>
+            </div>
+            <div class="menu-item" onclick="alert('Pengumuman')">
+                <div class="menu-icon green">📢</div>
+                <div class="menu-label">Pengumuman</div>
+            </div>
+            <div class="menu-item" onclick="alert('Hasil Ujian')">
+                <div class="menu-icon purple">📋</div>
+                <div class="menu-label">Hasil<br>Ujian</div>
+            </div>
+            <div class="menu-item" onclick="alert('Materi Belajar')">
+                <div class="menu-icon orange">📚</div>
+                <div class="menu-label">Materi<br>Belajar</div>
+            </div>
+            <div class="menu-item" onclick="alert('Simulasi Ujian')">
+                <div class="menu-icon pink">❓</div>
+                <div class="menu-label">Simulasi<br>Ujian</div>
+            </div>
+            <div class="menu-item" onclick="alert('Bantuan')">
+                <div class="menu-icon teal">ℹ️</div>
+                <div class="menu-label">Bantuan</div>
+            </div>
+            <div class="menu-item" onclick="alert('FAQ')">
+                <div class="menu-icon yellow">💬</div>
+                <div class="menu-label">FAQ</div>
+            </div>
+            <div class="menu-item" onclick="alert('Profil Saya')">
+                <div class="menu-icon blue">👤</div>
+                <div class="menu-label">Profil<br>Saya</div>
+            </div>
+        </div>
+
+        <div class="upcoming-exam" onclick="alert('Detail Ujian Matematika')">
+            <div class="exam-icon">📅⏰</div>
+            <div class="exam-info">
+                <div class="exam-label">Ujian Terdekat</div>
+                <div class="exam-subject">Matematika</div>
+                <div class="exam-datetime">Kamis, 25 Mei 2024</div>
+                <div class="exam-datetime">08.00 - 10.00 WIB</div>
+            </div>
+            <div class="exam-badge">Akan Datang</div>
+        </div>
+
+        <div class="section-header">
+            <h2 class="section-title">Pengumuman Terbaru</h2>
+            <a href="#" class="link-all">Lihat Semua</a>
+        </div>
+
+        <div class="announcements">
+            <div class="announcement-item" onclick="alert('Detail Pengumuman 1')">
+                <div class="announcement-icon blue">📢</div>
+                <div class="announcement-content">
+                    <div class="announcement-title">Jadwal Ujian Semester Genap 2023/2024</div>
+                    <div class="announcement-meta">20 Mei 2024 • Admin</div>
+                </div>
+                <span style="color: #cbd5e1;">›</span>
+            </div>
+
+            <div class="announcement-item" onclick="alert('Detail Pengumuman 2')">
+                <div class="announcement-icon orange">📄</div>
+                <div class="announcement-content">
+                    <div class="announcement-title">Ketentuan Pelaksanaan Ujian CBT</div>
+                    <div class="announcement-meta">18 Mei 2024 • Admin</div>
+                </div>
+                <span style="color: #cbd5e1;">›</span>
+            </div>
+
+            <div class="announcement-item" onclick="alert('Detail Pengumuman 3')">
+                <div class="announcement-icon green">🎉</div>
+                <div class="announcement-content">
+                    <div class="announcement-title">Selamat Mengerjakan Ujian!</div>
+                    <div class="announcement-meta">15 Mei 2024 • Admin</div>
+                </div>
+                <span style="color: #cbd5e1;">›</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="bottom-nav">
+        <div class="nav-item active" onclick="setActive(this)">
+            <div>🏠</div>
+            <div class="nav-label">Beranda</div>
+        </div>
+        <div class="nav-item" onclick="setActive(this)">
+            <div>📝</div>
+            <div class="nav-label">Ujian</div>
+        </div>
+        <div class="nav-item" onclick="setActive(this)">
+            <div>📢</div>
+            <div class="nav-label">Pengumuman</div>
+        </div>
+        <div class="nav-item" onclick="setActive(this)">
+            <div>✅</div>
+            <div class="nav-label">Hasil</div>
+        </div>
+        <div class="nav-item" onclick="setActive(this)">
+            <div>👤</div>
+            <div class="nav-label">Profil</div>
+        </div>
+    </div>
+
+    <script>
+        function setActive(element) {
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            element.classList.add('active');
+        }
+    </script>
+</body>
+</html>
