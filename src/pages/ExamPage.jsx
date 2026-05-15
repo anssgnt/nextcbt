@@ -272,11 +272,15 @@ export const ExamPage = () => {
                   {/* Pre-sync button */}
                   <button
                     onClick={() => handlePreSync(exam)}
-                    disabled={isSyncing || !isOnline}
-                    className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-50 transition"
+                    disabled={isSynced || isSyncing || !isOnline}
+                    className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg text-xs font-medium transition ${
+                      isSynced
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : 'bg-red-500 text-white hover:bg-red-600 shadow-sm'
+                    } disabled:opacity-60`}
                   >
                     {isSyncing ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-                    {isSyncing ? 'Sync...' : 'Sync'}
+                    {isSyncing ? 'Sync...' : isSynced ? 'Synced ✓' : 'Sync'}
                   </button>
 
                   {/* Masuk Ujian button */}

@@ -1,6 +1,6 @@
 // Service Worker - Always Fresh Strategy
-// Auto-generated version on build: v1778841865253
-const CACHE_VERSION = 'v1778841865253'
+// Auto-generated version on build: v1778846052516
+const CACHE_VERSION = 'v1778846052516'
 const CACHE_NAMES = {
   STATIC: `nextcbt-static-${CACHE_VERSION}`,
   DYNAMIC: `nextcbt-dynamic-${CACHE_VERSION}`,
