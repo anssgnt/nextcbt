@@ -206,11 +206,21 @@ export const ExamPage = () => {
                   {/* Masuk Ujian button */}
                   <button
                     onClick={() => handleMasukUjian(exam)}
-                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition active:scale-95"
+                    disabled={!isSynced}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition active:scale-95 ${
+                      isSynced ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    }`}
                   >
                     <KeyRound size={16} /> Masuk Ujian
                   </button>
                 </div>
+
+                {/* Notice sync dulu */}
+                {!isSynced && (
+                  <p className="text-[11px] text-orange-600 mt-2 text-center bg-orange-50 rounded-lg py-1.5 px-2">
+                    ⚠️ Sync soal terlebih dahulu sebelum mulai ujian
+                  </p>
+                )}
 
                 {isSynced && (
                   <p className="text-[10px] text-gray-400 mt-2 text-center">
