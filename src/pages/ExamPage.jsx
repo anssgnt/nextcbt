@@ -79,14 +79,28 @@ export const ExamPage = () => {
     setSyncing(exam.id)
     setTokenError('')
     try {
-      const meta = JSON.parse(exam.description || '{}')
-      const bankSoal = meta.bank_soal || meta.subject
+      // Fetch from published_exams (pre-compiled JSON)
+      const { data: pubData, error: pubErr } = await queuedFetch(
+        supabase.from('published_exams').select('data, version').eq('exam_id', exam.id).single()
+      )
+
       let questions = []
-      if (bankSoal) {
-        const { data } = await queuedFetch(
-          supabase.from('questions').select('id, question_text, type, options, correct_answer, score, matching_pairs, subject').eq('subject', bankSoal)
-        )
-        questions = data || []
+      let version = null
+
+      if (!pubErr && pubData?.data) {
+        // Use published data
+        questions = pubData.data.questions || []
+        version = pubData.version
+      } else {
+        // Fallback: fetch from questions table directly
+        const meta = JSON.parse(exam.description || '{}')
+        const bankSoal = meta.bank_soal || meta.subject
+        if (bankSoal) {
+          const { data } = await queuedFetch(
+            supabase.from('questions').select('id, question_text, type, options, correct_answer, score, matching_pairs, subject').eq('subject', bankSoal)
+          )
+          questions = data || []
+        }
       }
 
       // Simpan ke localStorage
@@ -94,13 +108,21 @@ export const ExamPage = () => {
         exam: { id: exam.id, title: exam.title, duration: exam.duration, questions_count: questions.length },
         questions,
         syncedAt: Date.now(),
-        meta,
+        version,
+        meta: JSON.parse(exam.description || '{}'),
       }
       localStorage.setItem(`exam_data_${exam.id}`, JSON.stringify(examData))
 
       const newSynced = { ...syncedExams, [exam.id]: Date.now() }
       setSyncedExams(newSynced)
       localStorage.setItem('synced_exams', JSON.stringify(newSynced))
+
+      // Save version info for footer display
+      if (version) {
+        const versions = JSON.parse(localStorage.getItem('exam_versions') || '{}')
+        versions[exam.id] = version
+        localStorage.setItem('exam_versions', JSON.stringify(versions))
+      }
 
       // Langsung mulai ujian
       setTokenModal(null)
@@ -117,25 +139,49 @@ export const ExamPage = () => {
     setSyncing(exam.id)
     setSyncError(null)
     try {
-      const meta = JSON.parse(exam.description || '{}')
-      const bankSoal = meta.bank_soal || meta.subject
+      // Fetch from published_exams (pre-compiled JSON)
+      const { data: pubData, error: pubErr } = await queuedFetch(
+        supabase.from('published_exams').select('data, version').eq('exam_id', exam.id).single()
+      )
+
       let questions = []
-      if (bankSoal) {
-        const { data } = await queuedFetch(
-          supabase.from('questions').select('id, question_text, type, options, correct_answer, score, matching_pairs, subject').eq('subject', bankSoal)
-        )
-        questions = data || []
+      let version = null
+
+      if (!pubErr && pubData?.data) {
+        // Use published data
+        questions = pubData.data.questions || []
+        version = pubData.version
+      } else {
+        // Fallback: fetch from questions table directly
+        const meta = JSON.parse(exam.description || '{}')
+        const bankSoal = meta.bank_soal || meta.subject
+        if (bankSoal) {
+          const { data } = await queuedFetch(
+            supabase.from('questions').select('id, question_text, type, options, correct_answer, score, matching_pairs, subject').eq('subject', bankSoal)
+          )
+          questions = data || []
+        }
       }
+
       const examData = {
         exam: { id: exam.id, title: exam.title, duration: exam.duration, questions_count: questions.length },
         questions,
         syncedAt: Date.now(),
+        version,
         meta: JSON.parse(exam.description || '{}'),
       }
       localStorage.setItem(`exam_data_${exam.id}`, JSON.stringify(examData))
+
       const newSynced = { ...syncedExams, [exam.id]: Date.now() }
       setSyncedExams(newSynced)
       localStorage.setItem('synced_exams', JSON.stringify(newSynced))
+
+      // Save version info for footer display
+      if (version) {
+        const versions = JSON.parse(localStorage.getItem('exam_versions') || '{}')
+        versions[exam.id] = version
+        localStorage.setItem('exam_versions', JSON.stringify(versions))
+      }
     } catch (err) {
       setSyncError({ examId: exam.id, message: err.message || 'Koneksi gagal' })
     } finally {

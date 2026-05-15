@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Home, BookOpen, Award, User, ArrowLeft } from 'lucide-react'
 
@@ -23,6 +24,20 @@ export const StudentLayout = ({ children, title, showBack = false, backTo }) => 
   const navigate = useNavigate()
   const location = useLocation()
   const showNav = PAGES_WITH_NAV.includes(location.pathname)
+
+  // Sync version tracking
+  const [syncVersion, setSyncVersion] = useState(null)
+  useEffect(() => {
+    try {
+      const versions = JSON.parse(localStorage.getItem('exam_versions') || '{}')
+      const allVersions = Object.values(versions)
+      if (allVersions.length > 0) {
+        // Show the most recent version
+        const latest = Math.max(...allVersions)
+        setSyncVersion(latest)
+      }
+    } catch { /* ignore */ }
+  }, [])
 
   const handleBack = () => {
     if (backTo) {
@@ -56,6 +71,15 @@ export const StudentLayout = ({ children, title, showBack = false, backTo }) => 
       {/* Bottom Navigation */}
       {showNav && (
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40 safe-area-bottom">
+          {/* Sync version indicator */}
+          {syncVersion && (
+            <div className="flex items-center justify-center gap-1.5 py-1 bg-gray-50 border-b border-gray-100">
+              <span className="w-2 h-2 rounded-full bg-green-500"></span>
+              <span className="text-[10px] text-gray-500">
+                v{new Date(syncVersion).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: '2-digit' })}
+              </span>
+            </div>
+          )}
           <div className="flex justify-around items-center px-2 py-2 max-w-md mx-auto">
             {NAV_ITEMS.map((item) => {
               const Icon = item.icon

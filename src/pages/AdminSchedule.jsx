@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, Loader2, Copy, Eye, RefreshCw, Edit2, Printer, FileText, X } from 'lucide-react'
+import { Plus, Trash2, Loader2, Copy, Eye, RefreshCw, Edit2, Printer, FileText, X, Upload } from 'lucide-react'
 import { AdminLayout } from '../layouts/AdminLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { supabase } from '../lib/supabase'
@@ -20,6 +20,7 @@ export const AdminSchedule = () => {
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState(null)
   const [previewSoal, setPreviewSoal] = useState(null)
+  const [publishing, setPublishing] = useState(null) // exam id being published
   const [bankSoalList, setBankSoalList] = useState([]) // list mapel dari bank soal dengan jumlah
   const [form, setForm] = useState({
     code: generateExamCode(),
@@ -122,6 +123,58 @@ export const AdminSchedule = () => {
     w.document.write(`</body></html>`)
     w.document.close()
     w.print()
+  }
+
+  const handlePublish = async (exam) => {
+    const meta = parseDescription(exam.description)
+    const bankSoal = meta.bank_soal || meta.subject
+    if (!bankSoal) {
+      alert('Ujian ini tidak memiliki bank soal yang ditentukan')
+      return
+    }
+
+    setPublishing(exam.id)
+    try {
+      // Fetch all questions from bank soal
+      const { data: questions, error: qErr } = await supabase
+        .from('questions')
+        .select('id, question_text, type, options, correct_answer, score, matching_pairs, subject')
+        .eq('subject', bankSoal)
+
+      if (qErr) throw qErr
+
+      const version = Date.now()
+      const publishData = {
+        exam: {
+          id: exam.id,
+          title: exam.title,
+          duration: exam.duration,
+          questions_count: (questions || []).length,
+          token: exam.token,
+        },
+        questions: questions || [],
+        meta,
+        version,
+      }
+
+      // Upsert to published_exams (1 row per exam)
+      const { error: pubErr } = await supabase
+        .from('published_exams')
+        .upsert({
+          exam_id: exam.id,
+          version,
+          data: publishData,
+          published_at: new Date().toISOString(),
+        }, { onConflict: 'exam_id' })
+
+      if (pubErr) throw pubErr
+
+      alert(`✅ Ujian "${exam.title}" berhasil dipublish!\nVersi: ${new Date(version).toLocaleString('id-ID')}\nJumlah soal: ${(questions || []).length}`)
+    } catch (err) {
+      alert('❌ Gagal publish: ' + err.message)
+    } finally {
+      setPublishing(null)
+    }
   }
 
   const handleCreate = async () => {
@@ -520,6 +573,14 @@ export const AdminSchedule = () => {
                                 className="p-1.5 text-orange-600 hover:bg-orange-50 rounded" title="Cetak Berita Acara"
                               >
                                 <FileText size={14} />
+                              </button>
+                              {/* Publish Ujian */}
+                              <button
+                                onClick={() => handlePublish(exam)}
+                                disabled={publishing === exam.id}
+                                className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded disabled:opacity-50" title="Publish Ujian (JSON)"
+                              >
+                                {publishing === exam.id ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
                               </button>
                               {/* Hapus */}
                               <button onClick={() => handleDelete(exam.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded" title="Hapus">
