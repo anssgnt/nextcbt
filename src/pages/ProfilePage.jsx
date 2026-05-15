@@ -42,15 +42,18 @@ export function ProfilePage() {
         {/* Hapus Sync */}
         <button
           onClick={() => {
-            if (confirm('Hapus semua data sync? Anda perlu sync ulang sebelum ujian.')) {
-              const keys = Object.keys(localStorage).filter((k) => k.startsWith('exam_data_') || k === 'synced_exams' || k === 'exam_versions')
+            if (confirm('Hapus semua data sync & status ujian? Anda perlu sync ulang dan bisa ujian lagi.')) {
+              const keys = Object.keys(localStorage).filter((k) =>
+                k.startsWith('exam_data_') || k.startsWith('answers_') || k.startsWith('pending_submit_') ||
+                k === 'synced_exams' || k === 'exam_versions' || k === 'completed_exams'
+              )
               keys.forEach((k) => localStorage.removeItem(k))
-              alert('Data sync dihapus. Silakan sync ulang.')
+              alert('Data sync & status ujian dihapus. Silakan sync ulang.')
             }
           }}
           className="w-full mt-3 bg-gray-100 text-gray-600 py-3 rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-gray-200 transition text-sm"
         >
-          🔄 Hapus Data Sync
+          🔄 Reset Sync & Ujian
         </button>
       </div>
     </StudentLayout>
