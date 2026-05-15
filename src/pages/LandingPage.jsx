@@ -1,7 +1,8 @@
 import { useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
-import { BookOpen, Calendar, ClipboardList, HelpCircle, Megaphone, ChevronRight, ArrowLeft } from 'lucide-react'
+import { BookOpen, Calendar, ClipboardList, HelpCircle, Megaphone, ChevronRight, ArrowLeft, Loader2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { queuedFetch } from '../utils/requestQueue'
 
 export default function LandingPage() {
   const navigate = useNavigate()
@@ -19,6 +20,7 @@ export default function LandingPage() {
   })
   const [exams, setExams] = useState([])
   const [activeSection, setActiveSection] = useState(null)
+  const [loadingExams, setLoadingExams] = useState(false)
 
   // Landing page TIDAK fetch Supabase - hemat quota
   // Exams di-fetch setelah login di halaman ExamPage
@@ -32,11 +34,9 @@ export default function LandingPage() {
       if (cacheTime && (now - parseInt(cacheTime)) < 3600000) return
 
       try {
-        const { data } = await supabase
-          .from('app_settings')
-          .select('data')
-          .eq('id', 'main')
-          .single()
+        const { data } = await queuedFetch(
+          supabase.from('app_settings').select('data').eq('id', 'main').single()
+        )
         if (data?.data) {
           setSettings(data.data)
           localStorage.setItem('cbt_settings_cache', JSON.stringify(data.data))
@@ -63,16 +63,15 @@ export default function LandingPage() {
 
   // Jadwal di-load hanya saat user klik tab Jadwal (hemat API)
   const loadExams = async () => {
-    if (exams.length > 0) return // sudah loaded
+    if (exams.length > 0) return
+    setLoadingExams(true)
     try {
-      const { data } = await supabase
-        .from('exams')
-        .select('id, title, duration, questions_count, description, is_active')
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(10)
+      const { data } = await queuedFetch(
+        supabase.from('exams').select('id, title, duration, questions_count, description, is_active').eq('is_active', true).order('created_at', { ascending: false }).limit(10)
+      )
       setExams(data || [])
     } catch (e) {}
+    setLoadingExams(false)
   }
 
   const getExamMeta = (exam) => { try { return JSON.parse(exam.description || '{}') } catch { return {} } }
@@ -146,7 +145,17 @@ export default function LandingPage() {
           {/* Jadwal */}
           {activeSection === 'jadwal' && (
             <div className="space-y-3">
-              {exams.length === 0 ? (
+              {loadingExams ? (
+                <div className="space-y-3">
+                  {[1,2,3].map((i) => (
+                    <div key={i} className="p-4 bg-gray-50 rounded-xl border border-gray-100 animate-pulse">
+                      <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                      <div className="h-3 bg-gray-200 rounded w-1/2 mb-2"></div>
+                      <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+                    </div>
+                  ))}
+                </div>
+              ) : exams.length === 0 ? (
                 <div className="text-center py-12 text-gray-400">
                   <Calendar size={40} className="mx-auto mb-3" />
                   <p className="font-medium">Belum ada jadwal ujian</p>

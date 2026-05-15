@@ -2,6 +2,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store'
 import { supabase } from '../lib/supabase'
+import { queuedFetch } from '../utils/requestQueue'
 
 export const StudentLogin = () => {
   const navigate = useNavigate()
@@ -17,11 +18,9 @@ export const StudentLogin = () => {
 
     setIsLoading(true)
     try {
-      const { data: student, error: err } = await supabase
-        .from('students')
-        .select('id, name, nis, class_name, email')
-        .eq('nis', nis.trim())
-        .single()
+      const { data: student, error: err } = await queuedFetch(
+        supabase.from('students').select('id, name, nis, class_name, email').eq('nis', nis.trim()).single()
+      )
 
       if (err || !student) { setError('NIS tidak ditemukan'); return }
 

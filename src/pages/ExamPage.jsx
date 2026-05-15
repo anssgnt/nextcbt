@@ -4,6 +4,7 @@ import { BookOpen, Download, CheckCircle, Loader2, Wifi, WifiOff, KeyRound, X, C
 import { useAuthStore } from '../store'
 import { supabase } from '../lib/supabase'
 import { StudentLayout } from '../layouts/StudentLayout'
+import { queuedFetch } from '../utils/requestQueue'
 
 export const ExamPage = () => {
   const navigate = useNavigate()
@@ -24,11 +25,9 @@ export const ExamPage = () => {
   const loadExams = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('exams')
-        .select('id, title, duration, questions_count, token, description, is_active')
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
+      const { data, error } = await queuedFetch(
+        supabase.from('exams').select('id, title, duration, questions_count, token, description, is_active').eq('is_active', true).order('created_at', { ascending: false })
+      )
       if (error) throw error
 
       const studentClass = user?.class_name || ''
@@ -82,10 +81,9 @@ export const ExamPage = () => {
       const bankSoal = meta.bank_soal || meta.subject
       let questions = []
       if (bankSoal) {
-        const { data } = await supabase
-          .from('questions')
-          .select('id, question_text, type, options, correct_answer, score, matching_pairs, subject')
-          .eq('subject', bankSoal)
+        const { data } = await queuedFetch(
+          supabase.from('questions').select('id, question_text, type, options, correct_answer, score, matching_pairs, subject').eq('subject', bankSoal)
+        )
         questions = data || []
       }
 
@@ -120,10 +118,9 @@ export const ExamPage = () => {
       const bankSoal = meta.bank_soal || meta.subject
       let questions = []
       if (bankSoal) {
-        const { data } = await supabase
-          .from('questions')
-          .select('id, question_text, type, options, correct_answer, score, matching_pairs, subject')
-          .eq('subject', bankSoal)
+        const { data } = await queuedFetch(
+          supabase.from('questions').select('id, question_text, type, options, correct_answer, score, matching_pairs, subject').eq('subject', bankSoal)
+        )
         questions = data || []
       }
       const examData = {

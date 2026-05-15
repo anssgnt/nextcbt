@@ -3,6 +3,7 @@ import { Loader2 } from 'lucide-react'
 import { useAuthStore } from '../store'
 import { supabase } from '../lib/supabase'
 import { StudentLayout } from '../layouts/StudentLayout'
+import { queuedFetch } from '../utils/requestQueue'
 
 export function ResultsPage() {
   const { user } = useAuthStore()
@@ -14,12 +15,9 @@ export function ResultsPage() {
   const loadResults = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('exam_sessions')
-        .select('id, score, status, submitted_at, exams(title, questions_count)')
-        .eq('student_id', user?.id)
-        .eq('status', 'submitted')
-        .order('submitted_at', { ascending: false })
+      const { data, error } = await queuedFetch(
+        supabase.from('exam_sessions').select('id, score, status, submitted_at, exams(title, questions_count)').eq('student_id', user?.id).eq('status', 'submitted').order('submitted_at', { ascending: false })
+      )
       if (error) throw error
       setResults(data || [])
     } catch (err) {
