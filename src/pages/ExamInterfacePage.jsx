@@ -4,7 +4,6 @@ import { Button, Card, Modal, Toast } from '../components'
 import { useExamStore, useAuthStore } from '../store'
 import { useExamTimer, useTabVisibility, useOnlineStatus } from '../hooks/useExam'
 import { studentService } from '../services/api'
-import { getSyncService } from '../services/syncService'
 import { formatTime, debounce } from '../utils/helpers'
 import { Clock, AlertCircle, Wifi, WifiOff } from 'lucide-react'
 
@@ -31,10 +30,6 @@ export const ExamInterfacePage = () => {
   const [showSubmitModal, setShowSubmitModal] = useState(false)
   const [toast, setToast] = useState(null)
   const isOnline = useOnlineStatus()
-  const [syncService, setSyncService] = useState(null)
-  const [offlineMode, setOfflineMode] = useState(false)
-  const [syncStatus, setSyncStatus] = useState(null)
-  const syncIntervalRef = useRef(null)
 
   const { timeRemaining, isTimeUp } = useExamTimer(currentExam?.duration)
 
@@ -42,127 +37,53 @@ export const ExamInterfacePage = () => {
     setShowWarning(true)
   })
 
-  // Initialize sync service
-  useEffect(() => {
-    const initSync = async () => {
-      try {
-        const service = await getSyncService(user.id)
-        setSyncService(service)
-      } catch (error) {
-        console.error('Failed to initialize sync service:', error)
-      }
-    }
-
-    if (user?.id) {
-      initSync()
-    }
-  }, [user?.id])
-
-  // Auto-sync pending submissions when online
-  useEffect(() => {
-    if (!syncService || !isOnline) return
-
-    const syncPending = async () => {
-      try {
-        await syncService.syncPendingSubmissions()
-        const status = await syncService.getSyncStatus()
-        setSyncStatus(status)
-      } catch (error) {
-        console.error('Failed to sync pending submissions:', error)
-      }
-    }
-
-    syncPending()
-    syncIntervalRef.current = setInterval(syncPending, 30000) // Sync every 30 seconds
-
-    return () => {
-      if (syncIntervalRef.current) {
-        clearInterval(syncIntervalRef.current)
-      }
-    }
-  }, [syncService, isOnline])
-
   useEffect(() => {
     if (isTimeUp) {
       handleSubmitExam()
     }
   }, [isTimeUp])
 
+  // Load exam from localStorage (already synced from ExamPage)
   useEffect(() => {
-    const loadExam = async () => {
+    const loadExam = () => {
       try {
-        let exam, questionsData
-
-        // Try to load from offline storage first
-        if (syncService) {
-          try {
-            const offlineData = await syncService.loadExamOffline(examId)
-            exam = offlineData.exam
-            questionsData = offlineData.questions
-            setOfflineMode(true)
-            setToast({ type: 'info', message: 'Loaded from offline storage' })
-          } catch (error) {
-            // Offline data not available, try online
-            if (!isOnline) {
-              throw new Error('No offline data available and offline')
-            }
-          }
+        const cached = localStorage.getItem(`exam_data_${examId}`)
+        if (!cached) {
+          setToast({ type: 'error', message: 'Soal belum di-sync. Kembali ke daftar ujian.' })
+          setTimeout(() => navigate('/student/exams'), 2000)
+          return
         }
 
-        // If not loaded from offline, fetch from API
-        if (!exam) {
-          const { data: examData } = await studentService.getActiveExams(user.id)
-          exam = examData?.find((e) => e.id === examId)
-          if (!exam) {
-            navigate('/student/exams')
-            return
-          }
+        const examData = JSON.parse(cached)
+        setCurrentExam(examData.exam)
 
-          const { data: questions } = await studentService.getExamQuestions(examId)
-          questionsData = questions || []
-
-          // Cache to offline storage
-          if (syncService) {
-            await syncService.syncExam(examId, user.id)
-          }
+        // Shuffle if enabled
+        let q = examData.questions || []
+        if (examData.meta?.shuffle) {
+          q = [...q].sort(() => Math.random() - 0.5)
         }
+        setQuestions(q)
 
-        setCurrentExam(exam)
-
+        // Generate session ID locally
         if (!sessionId) {
-          const { data: session } = await studentService.createExamSession(user.id, examId)
-          setSessionId(session.id)
+          setSessionId(`session_${examId}_${Date.now()}`)
         }
-
-        setQuestions(questionsData)
       } catch (err) {
-        setToast({ type: 'error', message: err.message || 'Failed to load exam' })
+        setToast({ type: 'error', message: 'Gagal memuat soal' })
       } finally {
         setIsLoading(false)
       }
     }
 
     loadExam()
-  }, [examId, user.id, syncService, isOnline])
+  }, [examId])
 
   const debouncedSaveAnswer = debounce(async (qId, answer) => {
-    if (!syncService) return
-
-    // Save locally first
-    try {
-      await syncService.saveAnswerLocal(examId, qId, answer)
-    } catch (error) {
-      console.error('Failed to save answer locally:', error)
-    }
-
-    // Try to sync if online
-    if (sessionId && isOnline) {
-      try {
-        await studentService.saveAnswer(sessionId, qId, answer)
-      } catch (error) {
-        console.error('Failed to sync answer:', error)
-      }
-    }
+    // Save to localStorage for offline persistence
+    const key = `answers_${examId}`
+    const saved = JSON.parse(localStorage.getItem(key) || '{}')
+    saved[qId] = answer
+    localStorage.setItem(key, JSON.stringify(saved))
   }, 2000)
 
   const handleAnswerChange = (questionId, answer) => {
@@ -171,32 +92,53 @@ export const ExamInterfacePage = () => {
   }
 
   const handleSubmitExam = async () => {
-    if (!sessionId || !syncService) return
-
     try {
-      // Get all local answers
-      const localAnswers = await syncService.getLocalAnswers(examId)
-      const answersMap = {}
-      localAnswers.forEach((ans) => {
-        answersMap[ans.questionId] = ans.answer
-      })
+      // Collect answers from state + localStorage
+      const savedAnswers = JSON.parse(localStorage.getItem(`answers_${examId}`) || '{}')
+      const allAnswers = { ...savedAnswers, ...answers }
 
       if (isOnline) {
-        // Submit directly if online
-        await studentService.submitExam(sessionId, { answers: answersMap })
-        navigate(`/result/${sessionId}`)
+        // Submit to Supabase
+        try {
+          const { queuedFetch } = await import('../utils/requestQueue')
+          const { supabase } = await import('../lib/supabase')
+          await queuedFetch(
+            supabase.from('exam_sessions').insert({
+              student_id: user?.id,
+              exam_id: examId,
+              status: 'submitted',
+              score: calculateScore(allAnswers),
+              submitted_at: new Date().toISOString(),
+            })
+          )
+        } catch (e) {
+          // Save locally if submit fails
+          localStorage.setItem(`pending_submit_${examId}`, JSON.stringify(allAnswers))
+        }
       } else {
-        // Queue for sync if offline
-        await syncService.queueSubmission(examId, sessionId, answersMap)
-        setToast({
-          type: 'info',
-          message: 'Exam queued for submission. Will sync when online.',
-        })
-        navigate(`/result/${sessionId}`)
+        // Save for later sync
+        localStorage.setItem(`pending_submit_${examId}`, JSON.stringify(allAnswers))
+        setToast({ type: 'info', message: 'Jawaban disimpan. Akan dikirim saat online.' })
       }
+
+      // Cleanup
+      localStorage.removeItem(`answers_${examId}`)
+      navigate('/student/exams')
     } catch (error) {
-      setToast({ type: 'error', message: 'Failed to submit exam' })
+      setToast({ type: 'error', message: 'Gagal submit' })
     }
+  }
+
+  // Simple scoring: compare answers with correct_answer
+  const calculateScore = (answersMap) => {
+    let correct = 0
+    questions.forEach((q) => {
+      const userAnswer = answersMap[q.id]
+      if (userAnswer && q.correct_answer && userAnswer === q.correct_answer) {
+        correct++
+      }
+    })
+    return questions.length > 0 ? Math.round((correct / questions.length) * 100) : 0
   }
 
   if (isLoading) {
@@ -366,7 +308,7 @@ export const ExamInterfacePage = () => {
                 </>
               )}
             </div>
-            {offlineMode && (
+            {!isOnline && (
               <div className="px-3 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium">
                 Offline Mode
               </div>
