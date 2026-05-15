@@ -48,7 +48,7 @@ export const StudentLogin = () => {
 
       // 3. Login berhasil
       setUser({ ...student, examId: exam.id, examTitle: exam.title }, 'student')
-      navigate('/student/exams')
+      navigate('/student/dashboard')
     } catch (err) {
       setError('Login gagal. Coba lagi.')
     } finally {
