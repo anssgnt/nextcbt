@@ -38,6 +38,20 @@ export function ProfilePage() {
         <button onClick={handleLogout} className="w-full bg-red-500 text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-red-600 transition active:scale-95">
           <LogOut size={20} /> Logout
         </button>
+
+        {/* Hapus Sync */}
+        <button
+          onClick={() => {
+            if (confirm('Hapus semua data sync? Anda perlu sync ulang sebelum ujian.')) {
+              const keys = Object.keys(localStorage).filter((k) => k.startsWith('exam_data_') || k === 'synced_exams' || k === 'exam_versions')
+              keys.forEach((k) => localStorage.removeItem(k))
+              alert('Data sync dihapus. Silakan sync ulang.')
+            }
+          }}
+          className="w-full mt-3 bg-gray-100 text-gray-600 py-3 rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-gray-200 transition text-sm"
+        >
+          🔄 Hapus Data Sync
+        </button>
       </div>
     </StudentLayout>
   )

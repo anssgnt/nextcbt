@@ -24,11 +24,15 @@ export const ExamInterfacePage = () => {
   const [showSubmitModal, setShowSubmitModal] = useState(false)
   const [showNav, setShowNav] = useState(false)
   const [toast, setToast] = useState(null)
+  const [violations, setViolations] = useState(0)
   const isOnline = useOnlineStatus()
 
   const { timeRemaining, isTimeUp } = useExamTimer(currentExam?.duration)
 
-  useTabVisibility(() => setShowWarning(true))
+  useTabVisibility(() => {
+    setViolations((v) => v + 1)
+    setShowWarning(true)
+  })
   useEffect(() => { if (isTimeUp) handleSubmitExam() }, [isTimeUp])
 
   useEffect(() => {
@@ -79,6 +83,12 @@ export const ExamInterfacePage = () => {
         setToast({ type: 'info', message: 'Jawaban disimpan. Akan dikirim saat online.' })
       }
       localStorage.removeItem(`answers_${examId}`)
+      // Mark as completed
+      const completed = JSON.parse(localStorage.getItem('completed_exams') || '{}')
+      completed[examId] = Date.now()
+      localStorage.setItem('completed_exams', JSON.stringify(completed))
+      // Exit fullscreen
+      try { document.exitFullscreen?.() } catch {}
       navigate('/student/exams')
     } catch { setToast({ type: 'error', message: 'Gagal submit' }) }
   }
@@ -279,10 +289,16 @@ export const ExamInterfacePage = () => {
       </div>
 
       {/* Modals */}
-      <Modal isOpen={showWarning} onClose={() => setShowWarning(false)} title="Peringatan">
+      <Modal isOpen={showWarning} onClose={() => setShowWarning(false)} title="⚠️ Peringatan">
         <div className="space-y-4">
-          <p className="text-gray-700 text-sm">Anda berpindah tab. Tetap fokus pada ujian.</p>
-          <Button onClick={() => setShowWarning(false)}>Lanjutkan</Button>
+          <div className="text-center">
+            <p className="text-4xl font-bold text-red-600 mb-2">{violations}x</p>
+            <p className="text-gray-700 text-sm">Anda terdeteksi keluar dari halaman ujian.</p>
+            <p className="text-xs text-gray-500 mt-1">Pelanggaran dicatat dan dilaporkan ke pengawas.</p>
+          </div>
+          <Button onClick={() => { setShowWarning(false); try { document.documentElement.requestFullscreen?.() } catch {} }}>
+            Kembali ke Ujian
+          </Button>
         </div>
       </Modal>
 

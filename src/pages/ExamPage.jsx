@@ -15,11 +15,14 @@ export const ExamPage = () => {
   const [syncedExams, setSyncedExams] = useState(() => {
     try { return JSON.parse(localStorage.getItem('synced_exams') || '{}') } catch { return {} }
   })
-  const [tokenModal, setTokenModal] = useState(null) // exam object
+  const [tokenModal, setTokenModal] = useState(null)
   const [tokenInput, setTokenInput] = useState('')
   const [tokenError, setTokenError] = useState('')
-  const [syncError, setSyncError] = useState(null) // {examId, message}
+  const [syncError, setSyncError] = useState(null)
   const [loadError, setLoadError] = useState(null)
+  const [completedExams] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('completed_exams') || '{}') } catch { return {} }
+  })
   const isOnline = navigator.onLine
 
   useEffect(() => { loadExams() }, [])
@@ -63,13 +66,13 @@ export const ExamPage = () => {
       setTokenError('Token tidak valid')
       return
     }
-    // Token valid → cek apakah sudah sync
+    // Token valid → fullscreen + mulai
+    try { document.documentElement.requestFullscreen?.() } catch {}
+
     if (syncedExams[tokenModal.id]) {
-      // Sudah sync → langsung mulai
       setTokenModal(null)
       navigate(`/exam/${tokenModal.id}`)
     } else {
-      // Belum sync → sync dulu
       handleSyncAndStart(tokenModal)
     }
   }
@@ -286,12 +289,16 @@ export const ExamPage = () => {
                   {/* Masuk Ujian button */}
                   <button
                     onClick={() => handleMasukUjian(exam)}
-                    disabled={!isSynced}
+                    disabled={!isSynced || !!completedExams[exam.id]}
                     className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition active:scale-95 ${
-                      isSynced ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      completedExams[exam.id]
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : isSynced
+                        ? 'bg-blue-600 text-white hover:bg-blue-700'
+                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     }`}
                   >
-                    <KeyRound size={16} /> Masuk Ujian
+                    <KeyRound size={16} /> {completedExams[exam.id] ? 'Sudah Ujian' : 'Masuk Ujian'}
                   </button>
                 </div>
 
