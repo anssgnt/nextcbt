@@ -32,6 +32,8 @@ export const AdminSettings = () => {
       tataTertib: '1. Siswa wajib hadir 15 menit sebelum ujian\n2. Dilarang membuka aplikasi lain saat ujian\n3. Dilarang bekerja sama dengan siswa lain\n4. Pastikan baterai HP terisi penuh\n5. Sync soal sebelum ujian dimulai',
       tutorialPanduan: '1. Login menggunakan NIS\n2. Pilih ujian yang tersedia\n3. Klik Sync untuk download soal\n4. Masukkan token dari pengawas\n5. Kerjakan soal hingga selesai\n6. Klik Submit untuk mengirim jawaban',
       pengumuman: '',
+      forcePwa: false,
+      loginMode: 'nis',
     }
   })
 
@@ -316,7 +318,46 @@ export const AdminSettings = () => {
           </CardContent>
         </Card>
 
-        {/* Tata Tertib, Tutorial, Pengumuman */}
+        {/* PWA & Login Mode */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Mode Aplikasi & Login</CardTitle>
+            <CardDescription>Pengaturan PWA dan metode login siswa</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <div>
+                <p className="font-medium text-gray-900 text-sm">Wajib Install PWA</p>
+                <p className="text-xs text-gray-500">Jika aktif, siswa harus install aplikasi (tidak bisa buka di browser biasa)</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={settings.forcePwa}
+                onChange={(e) => handleChange('forcePwa', e.target.checked)}
+                className="w-5 h-5 text-blue-600 rounded"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Mode Login Siswa</label>
+              <select
+                value={settings.loginMode}
+                onChange={(e) => handleChange('loginMode', e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="nis">Login dengan NIS</option>
+                <option value="nama">Login dengan Nama (autosuggest)</option>
+                <option value="both">Keduanya (switch NIS / Nama)</option>
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                {settings.loginMode === 'nis' && 'Siswa memasukkan NIS untuk login'}
+                {settings.loginMode === 'nama' && 'Siswa mengetik nama, muncul suggestion dari database'}
+                {settings.loginMode === 'both' && 'Siswa bisa pilih login pakai NIS atau Nama'}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Informasi Landing Page */}
         <Card className="mb-6">
           <CardHeader>
             <CardTitle>Informasi Landing Page</CardTitle>
