@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, LogOut } from 'lucide-react'
+import { LogOut } from 'lucide-react'
 import { useAuthStore } from '../store'
+import { StudentLayout } from '../layouts/StudentLayout'
 
 export function ProfilePage() {
   const navigate = useNavigate()
@@ -12,9 +13,8 @@ export function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-8">
-      <div className="bg-blue-600 text-white px-4 py-4 flex items-center gap-3">
-        <button onClick={() => navigate(-1)} className="hover:opacity-80"><ArrowLeft size={24} /></button>
+    <StudentLayout>
+      <div className="bg-blue-600 text-white px-4 py-4">
         <h1 className="font-bold text-lg">Profil Saya</h1>
       </div>
 
@@ -29,27 +29,16 @@ export function ProfilePage() {
               <p className="text-sm text-gray-500">{user?.class_name || '-'}</p>
             </div>
           </div>
-
           <div className="space-y-4 border-t pt-4">
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Nama Lengkap</p>
-              <p className="text-sm font-medium text-gray-800">{user?.name || '-'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 mb-1">NIS</p>
-              <p className="text-sm font-medium text-gray-800">{user?.nis || '-'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Kelas</p>
-              <p className="text-sm font-medium text-gray-800">{user?.class_name || '-'}</p>
-            </div>
+            <div><p className="text-xs text-gray-500 mb-1">Nama</p><p className="text-sm font-medium">{user?.name || '-'}</p></div>
+            <div><p className="text-xs text-gray-500 mb-1">NIS</p><p className="text-sm font-medium">{user?.nis || '-'}</p></div>
+            <div><p className="text-xs text-gray-500 mb-1">Kelas</p><p className="text-sm font-medium">{user?.class_name || '-'}</p></div>
           </div>
         </div>
-
-        <button onClick={handleLogout} className="w-full bg-red-500 text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-red-600 transition">
+        <button onClick={handleLogout} className="w-full bg-red-500 text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-red-600 transition active:scale-95">
           <LogOut size={20} /> Logout
         </button>
       </div>
-    </div>
+    </StudentLayout>
   )
 }

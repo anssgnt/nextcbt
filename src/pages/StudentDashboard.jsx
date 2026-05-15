@@ -1,6 +1,7 @@
 ﻿import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store'
 import { BookOpen, Award, User, LogOut, CheckCircle } from 'lucide-react'
+import { StudentLayout } from '../layouts/StudentLayout'
 
 export const StudentDashboard = () => {
   const navigate = useNavigate()
@@ -14,7 +15,7 @@ export const StudentDashboard = () => {
   const settings = JSON.parse(localStorage.getItem('cbt_settings') || '{}')
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <StudentLayout>
       {/* Header */}
       <div className="bg-blue-600 text-white px-4 py-5">
         <div className="flex items-center justify-between">
@@ -27,7 +28,7 @@ export const StudentDashboard = () => {
               <h1 className="font-bold">{user?.name || 'Siswa'}</h1>
             </div>
           </div>
-          <button onClick={handleLogout} className="p-2 hover:bg-white/10 rounded-lg">
+          <button onClick={handleLogout} className="p-2 hover:bg-white/10 rounded-lg" title="Logout">
             <LogOut size={20} />
           </button>
         </div>
@@ -63,40 +64,23 @@ export const StudentDashboard = () => {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <button
-            onClick={() => navigate('/student/exams')}
-            className="bg-blue-600 text-white rounded-xl p-4 text-center hover:bg-blue-700 transition"
-          >
+        <div className="grid grid-cols-2 gap-3">
+          <button onClick={() => navigate('/student/exams')} className="bg-blue-600 text-white rounded-xl p-4 text-center hover:bg-blue-700 transition active:scale-95">
             <BookOpen size={28} className="mx-auto mb-2" />
             <p className="font-semibold text-sm">Daftar Ujian</p>
-            <p className="text-xs text-blue-200 mt-0.5">Sync & mulai ujian</p>
+            <p className="text-xs text-blue-200 mt-0.5">Sync & mulai</p>
           </button>
-          <button
-            onClick={() => navigate('/results')}
-            className="bg-white border border-gray-200 text-gray-800 rounded-xl p-4 text-center hover:bg-gray-50 transition"
-          >
+          <button onClick={() => navigate('/results')} className="bg-white border border-gray-200 text-gray-800 rounded-xl p-4 text-center hover:bg-gray-50 transition active:scale-95">
             <Award size={28} className="mx-auto mb-2 text-purple-600" />
             <p className="font-semibold text-sm">Hasil Ujian</p>
             <p className="text-xs text-gray-500 mt-0.5">Lihat nilai</p>
           </button>
         </div>
-
-        <button
-          onClick={() => navigate('/profile')}
-          className="w-full bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-3 hover:bg-gray-50 transition"
-        >
-          <User size={20} className="text-gray-600" />
-          <span className="text-sm font-medium text-gray-700">Profil Saya</span>
-        </button>
       </div>
 
-      {/* School info */}
-      <div className="px-4 mt-4">
-        <p className="text-center text-xs text-gray-400">
-          {settings.schoolName || 'NextCBT'} © {new Date().getFullYear()}
-        </p>
+      <div className="px-4">
+        <p className="text-center text-xs text-gray-400">{settings.schoolName || 'NextCBT'} © {new Date().getFullYear()}</p>
       </div>
-    </div>
+    </StudentLayout>
   )
 }

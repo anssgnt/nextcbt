@@ -7,6 +7,7 @@
   to { transform: translateX(0); opacity: 1; }
 }
 .animate-slide-in { animation: slide-in 0.3s ease-out; }
+.safe-area-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
 
 * {
   -webkit-user-select: none;

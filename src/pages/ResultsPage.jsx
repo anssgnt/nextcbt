@@ -1,18 +1,15 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { useAuthStore } from '../store'
 import { supabase } from '../lib/supabase'
+import { StudentLayout } from '../layouts/StudentLayout'
 
 export function ResultsPage() {
-  const navigate = useNavigate()
   const { user } = useAuthStore()
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadResults()
-  }, [])
+  useEffect(() => { loadResults() }, [])
 
   const loadResults = async () => {
     setLoading(true)
@@ -23,7 +20,6 @@ export function ResultsPage() {
         .eq('student_id', user?.id)
         .eq('status', 'submitted')
         .order('submitted_at', { ascending: false })
-
       if (error) throw error
       setResults(data || [])
     } catch (err) {
@@ -34,9 +30,8 @@ export function ResultsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-8">
-      <div className="bg-blue-600 text-white px-4 py-4 flex items-center gap-3">
-        <button onClick={() => navigate(-1)} className="hover:opacity-80"><ArrowLeft size={24} /></button>
+    <StudentLayout>
+      <div className="bg-blue-600 text-white px-4 py-4">
         <h1 className="font-bold text-lg">Hasil Ujian</h1>
       </div>
 
@@ -45,13 +40,14 @@ export function ResultsPage() {
           <div className="flex justify-center py-12"><Loader2 size={24} className="animate-spin text-blue-600" /></div>
         ) : results.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
+            <p className="text-4xl mb-3">📊</p>
             <p className="font-medium">Belum ada hasil ujian</p>
             <p className="text-sm mt-1">Kerjakan ujian untuk melihat hasil</p>
           </div>
         ) : (
           results.map((item) => (
             <div key={item.id} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-              <div className="flex justify-between items-start mb-2">
+              <div className="flex justify-between items-start">
                 <div>
                   <h3 className="font-bold text-gray-800">{item.exams?.title || '-'}</h3>
                   <p className="text-xs text-gray-500">{item.submitted_at ? new Date(item.submitted_at).toLocaleDateString('id-ID') : '-'}</p>
@@ -61,13 +57,10 @@ export function ResultsPage() {
                   <p className="text-xs text-gray-500">Nilai</p>
                 </div>
               </div>
-              <div className="text-xs text-gray-500">
-                {item.exams?.questions_count || '?'} soal
-              </div>
             </div>
           ))
         )}
       </div>
-    </div>
+    </StudentLayout>
   )
 }
