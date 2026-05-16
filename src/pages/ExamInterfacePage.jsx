@@ -81,15 +81,29 @@ export const ExamInterfacePage = () => {
           const { queuedFetch } = await import('../utils/requestQueue')
           const { supabase } = await import('../lib/supabase')
 
-          // 1. Insert exam_session dan ambil ID-nya
-          const { data: sessionData } = await queuedFetch(
-            supabase.from('exam_sessions').insert({
-              student_id: user?.id, exam_id: examId, status: 'submitted',
-              score: finalScore, submitted_at: new Date().toISOString(),
-            }).select('id').single()
-          )
+          // Random delay 0-3 detik untuk menghindari 1000 siswa hit server bersamaan
+          await new Promise((r) => setTimeout(r, Math.random() * 3000))
 
-          // 2. Simpan jawaban per soal ke tabel answers
+          // 1. Insert exam_session dan ambil ID-nya (retry up to 2x)
+          let sessionData = null
+          for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+              const { data, error } = await queuedFetch(
+                supabase.from('exam_sessions').insert({
+                  student_id: user?.id, exam_id: examId, status: 'submitted',
+                  score: finalScore, submitted_at: new Date().toISOString(),
+                }).select('id').single()
+              )
+              if (error) throw error
+              sessionData = data
+              break
+            } catch (e) {
+              if (attempt === 2) throw e
+              await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)))
+            }
+          }
+
+          // 2. Simpan jawaban per soal ke tabel answers (single batch)
           if (sessionData?.id) {
             const answersToInsert = Object.entries(allAnswers)
               .filter(([, val]) => val !== null && val !== undefined && val !== '')
