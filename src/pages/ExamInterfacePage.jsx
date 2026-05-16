@@ -80,10 +80,32 @@ export const ExamInterfacePage = () => {
         try {
           const { queuedFetch } = await import('../utils/requestQueue')
           const { supabase } = await import('../lib/supabase')
-          await queuedFetch(supabase.from('exam_sessions').insert({
-            student_id: user?.id, exam_id: examId, status: 'submitted',
-            score: finalScore, submitted_at: new Date().toISOString(),
-          }))
+
+          // 1. Insert exam_session dan ambil ID-nya
+          const { data: sessionData } = await queuedFetch(
+            supabase.from('exam_sessions').insert({
+              student_id: user?.id, exam_id: examId, status: 'submitted',
+              score: finalScore, submitted_at: new Date().toISOString(),
+            }).select('id').single()
+          )
+
+          // 2. Simpan jawaban per soal ke tabel answers
+          if (sessionData?.id) {
+            const answersToInsert = Object.entries(allAnswers)
+              .filter(([, val]) => val !== null && val !== undefined && val !== '')
+              .map(([questionId, answerValue]) => ({
+                session_id: sessionData.id,
+                question_id: questionId,
+                answer_text: typeof answerValue === 'object' ? JSON.stringify(answerValue) : String(answerValue),
+                answered_at: new Date().toISOString(),
+              }))
+
+            if (answersToInsert.length > 0) {
+              await queuedFetch(
+                supabase.from('answers').upsert(answersToInsert, { onConflict: 'session_id,question_id' })
+              )
+            }
+          }
         } catch { localStorage.setItem(`pending_submit_${examId}`, JSON.stringify(allAnswers)) }
       } else {
         localStorage.setItem(`pending_submit_${examId}`, JSON.stringify(allAnswers))
@@ -96,8 +118,12 @@ export const ExamInterfacePage = () => {
       questions.forEach((q) => {
         const a = allAnswers[q.id]
         if (a && q.correct_answer) {
-          if (Array.isArray(a)) { if (a.sort().join(',') === q.correct_answer) correctCount++; else wrongCount++ }
-          else if (a === q.correct_answer) correctCount++
+          const type = q.type
+          if (type === 'uraian_singkat' || type === 'short_answer' || type === 'essay') {
+            if (isEssayCorrect(a, q.correct_answer)) correctCount++; else wrongCount++
+          } else if (Array.isArray(a)) {
+            if (a.sort().join(',') === q.correct_answer) correctCount++; else wrongCount++
+          } else if (a === q.correct_answer) correctCount++
           else wrongCount++
         } else { wrongCount++ }
       })
