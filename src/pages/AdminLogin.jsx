@@ -21,19 +21,27 @@ export const AdminLogin = () => {
     try {
       // Check against admins table in Supabase
       const { data, error: dbError } = await queuedFetch(
-        supabase.from('admins').select('id, email, name').eq('email', email).eq('password', password).single()
+        supabase.from('admins').select('id, email, name, password').eq('email', email).single()
       )
 
       if (!dbError && data) {
-        setUser({ id: data.id, email: data.email, name: data.name || 'Admin' }, 'admin')
-        navigate('/admin/dashboard')
-        return
+        // Verify password
+        if (data.password === password) {
+          setUser({ id: data.id, email: data.email, name: data.name || 'Admin' }, 'admin')
+          navigate('/admin/dashboard')
+          setIsLoading(false)
+          return
+        } else {
+          setError('Password salah')
+          setIsLoading(false)
+          return
+        }
       }
     } catch {
       // DB check failed, fall through to mock credentials
     }
 
-    // Fallback: mock credentials
+    // Fallback: mock credentials (jika tabel belum ada atau DB error)
     if (email === 'admin@cbt.com' && password === 'admin123') {
       setUser({ id: 'admin-1', email, name: 'Admin' }, 'admin')
       navigate('/admin/dashboard')

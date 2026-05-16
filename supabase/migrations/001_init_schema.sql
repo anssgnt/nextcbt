@@ -9,6 +9,8 @@
 CREATE TABLE IF NOT EXISTS admins (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email TEXT UNIQUE NOT NULL,
+  password TEXT NOT NULL DEFAULT 'admin123',
+  name TEXT DEFAULT 'Admin',
   created_at TIMESTAMP DEFAULT NOW()
 );
 
