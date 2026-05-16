@@ -46,10 +46,15 @@ export const AdminSettings = () => {
           .from('app_settings')
           .select('data')
           .eq('id', 'main')
-          .single()
+          .maybeSingle()
 
-        if (!error && data?.data?.settings) {
-          const dbSettings = { ...DEFAULT_SETTINGS, ...data.data.settings }
+        if (!error && data?.data) {
+          // Handle both formats:
+          // Format 1 (after save): { settings: {...}, exams: [...], version: ... }
+          // Format 2 (initial/legacy): { schoolName: "...", ... }
+          const rawData = data.data
+          const settingsData = rawData.settings || rawData
+          const dbSettings = { ...DEFAULT_SETTINGS, ...settingsData }
           setSettings(dbSettings)
           // Sync ke localStorage sebagai cache
           localStorage.setItem('cbt_settings', JSON.stringify(dbSettings))
