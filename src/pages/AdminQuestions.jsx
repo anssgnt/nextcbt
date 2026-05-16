@@ -26,11 +26,13 @@ export const AdminQuestions = () => {
   const [importing, setImporting] = useState(false)
   const [file, setFile] = useState(null)
 
-  // Views: 'list' | 'create' | 'preview' | 'detail'
+  // Views: 'list' | 'create' | 'preview' | 'detail' | 'edit'
   const [view, setView] = useState('list')
   const [selectedSubject, setSelectedSubject] = useState(null)
   const [previewData, setPreviewData] = useState(null)
   const [newBankName, setNewBankName] = useState('')
+  const [editingQuestion, setEditingQuestion] = useState(null)
+  const [savingEdit, setSavingEdit] = useState(false)
 
   useEffect(() => {
     loadQuestions()
@@ -200,6 +202,46 @@ export const AdminQuestions = () => {
       setQuestions(questions.filter((q) => q.id !== id))
     } catch (err) {
       alert('Gagal: ' + err.message)
+    }
+  }
+
+  const handleEditQuestion = (q) => {
+    setEditingQuestion({
+      id: q.id,
+      question_text: q.question_text || q.text || '',
+      type: q.type,
+      options: q.options ? [...q.options] : [],
+      correct_answer: q.correct_answer || '',
+      score: q.score || 1,
+      matching_pairs: q.matching_pairs ? [...q.matching_pairs] : [],
+      subject: q.subject || '',
+    })
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editingQuestion) return
+    setSavingEdit(true)
+    try {
+      const updateData = {
+        question_text: editingQuestion.question_text,
+        type: editingQuestion.type,
+        correct_answer: editingQuestion.correct_answer,
+        score: editingQuestion.score,
+        options: editingQuestion.options.length > 0 ? editingQuestion.options : null,
+        matching_pairs: editingQuestion.matching_pairs.length > 0 ? editingQuestion.matching_pairs : null,
+      }
+      const { error } = await adminService.updateQuestion(editingQuestion.id, updateData)
+      if (error) throw error
+
+      // Update local state
+      setQuestions(questions.map((q) =>
+        q.id === editingQuestion.id ? { ...q, ...updateData } : q
+      ))
+      setEditingQuestion(null)
+    } catch (err) {
+      alert('Gagal menyimpan: ' + err.message)
+    } finally {
+      setSavingEdit(false)
     }
   }
 
@@ -461,12 +503,218 @@ export const AdminQuestions = () => {
             {subjectQuestions.map((q, idx) => (
               <div key={q.id} className="relative">
                 {renderQuestion(q, idx)}
-                <button onClick={() => handleDeleteQuestion(q.id)} className="absolute top-3 right-3 p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded" title="Hapus soal">
-                  <Trash2 size={14} />
-                </button>
+                <div className="absolute top-3 right-3 flex gap-1">
+                  <button onClick={() => handleEditQuestion(q)} className="p-1.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded" title="Edit soal">
+                    <Edit2 size={14} />
+                  </button>
+                  <button onClick={() => handleDeleteQuestion(q.id)} className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded" title="Hapus soal">
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
+
+          {/* Edit Question Modal */}
+          {editingQuestion && (
+            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-xl max-w-2xl w-full max-h-[85vh] overflow-hidden flex flex-col">
+                <div className="flex items-center justify-between p-4 border-b">
+                  <h3 className="font-bold text-lg">Edit Soal</h3>
+                  <button onClick={() => setEditingQuestion(null)} className="p-2 hover:bg-gray-100 rounded-lg">
+                    <X size={20} />
+                  </button>
+                </div>
+                <div className="overflow-y-auto p-4 space-y-4">
+                  {/* Tipe Soal */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Tipe Soal</label>
+                    <select
+                      value={editingQuestion.type}
+                      onChange={(e) => setEditingQuestion({ ...editingQuestion, type: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    >
+                      {Object.entries(QUESTION_TYPES).map(([k, v]) => (
+                        <option key={k} value={k}>{v}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Teks Soal */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Teks Soal</label>
+                    <textarea
+                      value={editingQuestion.question_text}
+                      onChange={(e) => setEditingQuestion({ ...editingQuestion, question_text: e.target.value })}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    />
+                  </div>
+
+                  {/* Opsi (PG / PG Kompleks) */}
+                  {(editingQuestion.type === 'pilihan_ganda' || editingQuestion.type === 'pilihan_ganda_kompleks') && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Opsi Jawaban</label>
+                      <div className="space-y-2">
+                        {editingQuestion.options.map((opt, i) => (
+                          <div key={i} className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-gray-500 w-6">{opt.id}.</span>
+                            <input
+                              type="text"
+                              value={opt.text}
+                              onChange={(e) => {
+                                const newOpts = [...editingQuestion.options]
+                                newOpts[i] = { ...newOpts[i], text: e.target.value }
+                                setEditingQuestion({ ...editingQuestion, options: newOpts })
+                              }}
+                              className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
+                            />
+                            <button
+                              onClick={() => {
+                                const newOpts = editingQuestion.options.filter((_, idx) => idx !== i)
+                                setEditingQuestion({ ...editingQuestion, options: newOpts })
+                              }}
+                              className="p-1 text-red-400 hover:text-red-600"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          onClick={() => {
+                            const nextId = String.fromCharCode(65 + editingQuestion.options.length)
+                            setEditingQuestion({
+                              ...editingQuestion,
+                              options: [...editingQuestion.options, { id: nextId, text: '' }],
+                            })
+                          }}
+                          className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                          + Tambah Opsi
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Pasangan Menjodohkan */}
+                  {editingQuestion.type === 'menjodohkan' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Pasangan</label>
+                      <div className="space-y-2">
+                        {editingQuestion.matching_pairs.map((pair, i) => (
+                          <div key={i} className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={pair.left}
+                              onChange={(e) => {
+                                const newPairs = [...editingQuestion.matching_pairs]
+                                newPairs[i] = { ...newPairs[i], left: e.target.value }
+                                setEditingQuestion({ ...editingQuestion, matching_pairs: newPairs })
+                              }}
+                              placeholder="Kiri"
+                              className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
+                            />
+                            <span className="text-gray-400">→</span>
+                            <input
+                              type="text"
+                              value={pair.right}
+                              onChange={(e) => {
+                                const newPairs = [...editingQuestion.matching_pairs]
+                                newPairs[i] = { ...newPairs[i], right: e.target.value }
+                                setEditingQuestion({ ...editingQuestion, matching_pairs: newPairs })
+                              }}
+                              placeholder="Kanan"
+                              className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
+                            />
+                            <button
+                              onClick={() => {
+                                const newPairs = editingQuestion.matching_pairs.filter((_, idx) => idx !== i)
+                                setEditingQuestion({ ...editingQuestion, matching_pairs: newPairs })
+                              }}
+                              className="p-1 text-red-400 hover:text-red-600"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          onClick={() => {
+                            setEditingQuestion({
+                              ...editingQuestion,
+                              matching_pairs: [...editingQuestion.matching_pairs, { left: '', right: '' }],
+                            })
+                          }}
+                          className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                          + Tambah Pasangan
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Kunci Jawaban */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Kunci Jawaban</label>
+                    {editingQuestion.type === 'benar_salah' ? (
+                      <select
+                        value={editingQuestion.correct_answer}
+                        onChange={(e) => setEditingQuestion({ ...editingQuestion, correct_answer: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      >
+                        <option value="Benar">Benar</option>
+                        <option value="Salah">Salah</option>
+                      </select>
+                    ) : (editingQuestion.type === 'pilihan_ganda') ? (
+                      <select
+                        value={editingQuestion.correct_answer}
+                        onChange={(e) => setEditingQuestion({ ...editingQuestion, correct_answer: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      >
+                        <option value="">-- Pilih --</option>
+                        {editingQuestion.options.map((opt) => (
+                          <option key={opt.id} value={opt.id}>{opt.id}. {opt.text}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        value={editingQuestion.correct_answer}
+                        onChange={(e) => setEditingQuestion({ ...editingQuestion, correct_answer: e.target.value })}
+                        placeholder={editingQuestion.type === 'pilihan_ganda_kompleks' ? 'Contoh: A,B,D' : 'Ketik kunci jawaban'}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      />
+                    )}
+                    {editingQuestion.type === 'pilihan_ganda_kompleks' && (
+                      <p className="text-xs text-gray-400 mt-1">Pisahkan dengan koma, contoh: A,B,D</p>
+                    )}
+                  </div>
+
+                  {/* Skor */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Skor</label>
+                    <input
+                      type="number"
+                      value={editingQuestion.score}
+                      onChange={(e) => setEditingQuestion({ ...editingQuestion, score: parseInt(e.target.value) || 1 })}
+                      min="1"
+                      className="w-24 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    />
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="flex gap-3 p-4 border-t">
+                  <button onClick={() => setEditingQuestion(null)} className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm">
+                    Batal
+                  </button>
+                  <button onClick={handleSaveEdit} disabled={savingEdit} className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm disabled:opacity-50">
+                    {savingEdit ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
+                    {savingEdit ? 'Menyimpan...' : 'Simpan'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </AdminLayout>
     )

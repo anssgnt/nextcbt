@@ -209,6 +209,16 @@ export const adminService = {
     return { data, error }
   },
 
+  async updateQuestion(id, updates) {
+    const { data, error } = await supabase
+      .from('questions')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+    return { data, error }
+  },
+
   // ==================== EXAMS ====================
   async getExams() {
     const { data, error } = await supabase
