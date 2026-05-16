@@ -26,15 +26,38 @@ export const ExamInterfacePage = () => {
   const [toast, setToast] = useState(null)
   const [violations, setViolations] = useState(0)
   const [examMeta, setExamMeta] = useState({})
+  const [warningCountdown, setWarningCountdown] = useState(0)
   const isOnline = useOnlineStatus()
 
   const { timeRemaining, isTimeUp } = useExamTimer(currentExam?.duration)
 
   useTabVisibility(() => {
-    setViolations((v) => v + 1)
-    setShowWarning(true)
+    setViolations((v) => {
+      const newCount = v + 1
+      // Countdown semakin lama setiap pelanggaran
+      const durations = [5, 10, 20, 30, 30]
+      const countdown = durations[Math.min(newCount - 1, durations.length - 1)]
+      setWarningCountdown(countdown)
+      setShowWarning(true)
+      return newCount
+    })
   })
   useEffect(() => { if (isTimeUp) handleSubmitExam() }, [isTimeUp])
+
+  // Countdown timer untuk pelanggaran tab
+  useEffect(() => {
+    if (!showWarning || warningCountdown <= 0) return
+    const timer = setInterval(() => {
+      setWarningCountdown((c) => {
+        if (c <= 1) {
+          clearInterval(timer)
+          return 0
+        }
+        return c - 1
+      })
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [showWarning, warningCountdown > 0])
 
   useEffect(() => {
     try {
@@ -391,19 +414,44 @@ export const ExamInterfacePage = () => {
         </div>
       </div>
 
-      {/* Modals */}
-      <Modal isOpen={showWarning} onClose={() => setShowWarning(false)} title="⚠️ Peringatan">
-        <div className="space-y-4">
-          <div className="text-center">
-            <p className="text-4xl font-bold text-red-600 mb-2">{violations}x</p>
-            <p className="text-gray-700 text-sm">Anda terdeteksi keluar dari halaman ujian.</p>
-            <p className="text-xs text-gray-500 mt-1">Pelanggaran dicatat dan dilaporkan ke pengawas.</p>
+      {/* Violation Overlay with Countdown */}
+      {showWarning && (
+        <div className="fixed inset-0 bg-red-900/95 z-[9999] flex items-center justify-center p-4">
+          <div className="text-center text-white max-w-sm">
+            <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-red-700 flex items-center justify-center">
+              <span className="text-4xl">⚠️</span>
+            </div>
+            <h2 className="text-2xl font-bold mb-2">PELANGGARAN TERDETEKSI</h2>
+            <p className="text-red-200 mb-4">Anda terdeteksi keluar dari halaman ujian</p>
+
+            <div className="bg-red-800 rounded-2xl p-6 mb-4">
+              <p className="text-sm text-red-300 mb-1">Pelanggaran ke-</p>
+              <p className="text-5xl font-bold text-white">{violations}</p>
+            </div>
+
+            {warningCountdown > 0 ? (
+              <div className="mb-4">
+                <p className="text-sm text-red-300 mb-2">Anda harus menunggu sebelum melanjutkan</p>
+                <div className="w-24 h-24 mx-auto rounded-full border-4 border-red-400 flex items-center justify-center">
+                  <span className="text-4xl font-bold">{warningCountdown}</span>
+                </div>
+                <p className="text-xs text-red-400 mt-3">Pelanggaran dicatat dan dilaporkan ke pengawas</p>
+              </div>
+            ) : (
+              <button
+                onClick={() => { setShowWarning(false); try { document.documentElement.requestFullscreen?.() } catch {} }}
+                className="w-full py-3 bg-white text-red-900 rounded-xl font-bold text-sm hover:bg-red-100 transition"
+              >
+                Kembali ke Ujian
+              </button>
+            )}
+
+            {violations >= 3 && (
+              <p className="text-xs text-red-400 mt-3">⚠️ Pelanggaran berulang dapat mengakibatkan ujian dibatalkan</p>
+            )}
           </div>
-          <Button onClick={() => { setShowWarning(false); try { document.documentElement.requestFullscreen?.() } catch {} }}>
-            Kembali ke Ujian
-          </Button>
         </div>
-      </Modal>
+      )}
 
       <Modal isOpen={showSubmitModal} onClose={() => setShowSubmitModal(false)} title="Kumpulkan Jawaban">
         <div className="space-y-4">
