@@ -1,41 +1,73 @@
 import { useNavigate } from 'react-router-dom'
-import { Save, Upload } from 'lucide-react'
+import { Save, Upload, Loader2 } from 'lucide-react'
 import { AdminLayout } from '../layouts/AdminLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { supabase } from '../lib/supabase'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+
+const DEFAULT_SETTINGS = {
+  schoolName: 'SMP NEGERI 1',
+  schoolMotto: 'Cerdas, Berkarakter, Berprestasi',
+  schoolAddress: 'Jl. Pendidikan No. 1',
+  schoolPhone: '(021) 1234567',
+  schoolEmail: 'info@smpn1.sch.id',
+  examDuration: 120,
+  maxAttempts: 1,
+  passingScore: 70,
+  minWorkingTime: 30,
+  enableOfflineMode: true,
+  enableTabDetection: true,
+  autoSaveInterval: 30,
+  syncTime: 'H-1 23:59',
+  logo: null,
+  examInstruction: 'Baca setiap soal dengan teliti sebelum menjawab. Waktu ujian akan berjalan otomatis setelah Anda memulai.',
+  examFinishMessage: 'Terima kasih telah mengerjakan ujian. Hasil akan diumumkan setelah semua peserta selesai.',
+  showQuestionNumber: true,
+  examThemeColor: '#2563eb',
+  tataTertib: '1. Siswa wajib hadir 15 menit sebelum ujian\n2. Dilarang membuka aplikasi lain saat ujian\n3. Dilarang bekerja sama dengan siswa lain\n4. Pastikan baterai HP terisi penuh\n5. Sync soal sebelum ujian dimulai',
+  tutorialPanduan: '1. Login menggunakan NIS\n2. Pilih ujian yang tersedia\n3. Klik Sync untuk download soal\n4. Masukkan token dari pengawas\n5. Kerjakan soal hingga selesai\n6. Klik Submit untuk mengirim jawaban',
+  pengumuman: '',
+  forcePwa: false,
+  loginMode: 'nis',
+}
 
 export const AdminSettings = () => {
   const navigate = useNavigate()
   const [logoFile, setLogoFile] = useState(null)
-  const [settings, setSettings] = useState(() => {
-    const saved = localStorage.getItem('cbt_settings')
-    return saved ? JSON.parse(saved) : {
-      schoolName: 'SMP NEGERI 1',
-      schoolMotto: 'Cerdas, Berkarakter, Berprestasi',
-      schoolAddress: 'Jl. Pendidikan No. 1',
-      schoolPhone: '(021) 1234567',
-      schoolEmail: 'info@smpn1.sch.id',
-      examDuration: 120,
-      maxAttempts: 1,
-      passingScore: 70,
-      minWorkingTime: 30,
-      enableOfflineMode: true,
-      enableTabDetection: true,
-      autoSaveInterval: 30,
-      syncTime: 'H-1 23:59',
-      logo: null,
-      examInstruction: 'Baca setiap soal dengan teliti sebelum menjawab. Waktu ujian akan berjalan otomatis setelah Anda memulai.',
-      examFinishMessage: 'Terima kasih telah mengerjakan ujian. Hasil akan diumumkan setelah semua peserta selesai.',
-      showQuestionNumber: true,
-      examThemeColor: '#2563eb',
-      tataTertib: '1. Siswa wajib hadir 15 menit sebelum ujian\n2. Dilarang membuka aplikasi lain saat ujian\n3. Dilarang bekerja sama dengan siswa lain\n4. Pastikan baterai HP terisi penuh\n5. Sync soal sebelum ujian dimulai',
-      tutorialPanduan: '1. Login menggunakan NIS\n2. Pilih ujian yang tersedia\n3. Klik Sync untuk download soal\n4. Masukkan token dari pengawas\n5. Kerjakan soal hingga selesai\n6. Klik Submit untuk mengirim jawaban',
-      pengumuman: '',
-      forcePwa: false,
-      loginMode: 'nis',
+  const [loadingSettings, setLoadingSettings] = useState(true)
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS)
+
+  // Load settings dari Supabase saat mount, fallback ke localStorage
+  useEffect(() => {
+    const loadSettings = async () => {
+      setLoadingSettings(true)
+      try {
+        const { data, error } = await supabase
+          .from('app_settings')
+          .select('data')
+          .eq('id', 'main')
+          .single()
+
+        if (!error && data?.data?.settings) {
+          const dbSettings = { ...DEFAULT_SETTINGS, ...data.data.settings }
+          setSettings(dbSettings)
+          // Sync ke localStorage sebagai cache
+          localStorage.setItem('cbt_settings', JSON.stringify(dbSettings))
+        } else {
+          // Fallback ke localStorage
+          const saved = localStorage.getItem('cbt_settings')
+          if (saved) setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(saved) })
+        }
+      } catch {
+        // Offline fallback
+        const saved = localStorage.getItem('cbt_settings')
+        if (saved) setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(saved) })
+      } finally {
+        setLoadingSettings(false)
+      }
     }
-  })
+    loadSettings()
+  }, [])
 
   const handleChange = (field, value) => {
     setSettings(prev => ({ ...prev, [field]: value }))
@@ -90,6 +122,11 @@ export const AdminSettings = () => {
 
   return (
     <AdminLayout>
+      {loadingSettings ? (
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Loader2 size={32} className="animate-spin text-blue-600" />
+        </div>
+      ) : (
       <div className="max-w-4xl mx-auto px-8 py-8">
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-gray-900">Pengaturan Sistem</h1>
@@ -441,6 +478,7 @@ export const AdminSettings = () => {
           </button>
         </div>
       </div>
+      )}
     </AdminLayout>
   )
 }
