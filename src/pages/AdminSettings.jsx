@@ -36,6 +36,7 @@ export const AdminSettings = () => {
   const [logoFile, setLogoFile] = useState(null)
   const [loadingSettings, setLoadingSettings] = useState(true)
   const [settings, setSettings] = useState(DEFAULT_SETTINGS)
+  const [saving, setSaving] = useState(false)
 
   // Load settings dari Supabase saat mount, fallback ke localStorage
   useEffect(() => {
@@ -123,6 +124,7 @@ export const AdminSettings = () => {
   }
 
   const handleSave = async () => {
+    setSaving(true)
     localStorage.setItem('cbt_settings', JSON.stringify(settings))
 
     // Generate combined JSON: settings + active exams list
@@ -153,6 +155,8 @@ export const AdminSettings = () => {
       // Fallback: save settings only
       await supabase.from('app_settings').upsert({ id: 'main', data: { settings, version: Date.now() } }, { onConflict: 'id' }).catch(() => {})
       alert('Pengaturan disimpan! (jadwal gagal di-generate: ' + err.message + ')')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -507,10 +511,11 @@ export const AdminSettings = () => {
           </button>
           <button
             onClick={handleSave}
-            className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+            disabled={saving}
+            className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Save size={20} />
-            Simpan Pengaturan
+            {saving ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />}
+            {saving ? 'Menyimpan...' : 'Simpan Pengaturan'}
           </button>
         </div>
       </div>
