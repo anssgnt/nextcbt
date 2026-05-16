@@ -21,7 +21,7 @@ export const AdminLogin = () => {
     try {
       // Check against admins table in Supabase
       const { data, error: dbError } = await queuedFetch(
-        supabase.from('admins').select('id, email, name, password').eq('email', email).single()
+        supabase.from('admins').select('id, email, name, password').eq('email', email).maybeSingle()
       )
 
       if (!dbError && data) {
