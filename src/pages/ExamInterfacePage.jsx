@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Button, Modal, Toast } from '../components'
 import { useExamStore, useAuthStore } from '../store'
 import { useExamTimer, useTabVisibility, useOnlineStatus } from '../hooks/useExam'
-import { formatTime, debounce, isEssayCorrect } from '../utils/helpers'
+import { formatTime, debounce, isEssayCorrect, isMatchingCorrect } from '../utils/helpers'
 import { List, ChevronLeft, ChevronRight } from 'lucide-react'
 
 export const ExamInterfacePage = () => {
@@ -133,15 +133,16 @@ export const ExamInterfacePage = () => {
       let wrongCount = 0
       questions.forEach((q) => {
         const a = allAnswers[q.id]
-        if (a && q.correct_answer) {
-          const type = q.type
-          if (type === 'uraian_singkat' || type === 'short_answer' || type === 'essay') {
-            if (isEssayCorrect(a, q.correct_answer)) correctCount++; else wrongCount++
-          } else if (Array.isArray(a)) {
-            if (a.sort().join(',') === q.correct_answer) correctCount++; else wrongCount++
-          } else if (a === q.correct_answer) correctCount++
-          else wrongCount++
-        } else { wrongCount++ }
+        if (!a) { wrongCount++; return }
+        const type = q.type
+        if (type === 'uraian_singkat' || type === 'short_answer' || type === 'essay') {
+          if (q.correct_answer && isEssayCorrect(a, q.correct_answer)) correctCount++; else wrongCount++
+        } else if (type === 'menjodohkan' || type === 'matching') {
+          if (isMatchingCorrect(a, q.matching_pairs)) correctCount++; else wrongCount++
+        } else if (Array.isArray(a)) {
+          if (q.correct_answer && a.sort().join(',') === q.correct_answer) correctCount++; else wrongCount++
+        } else if (q.correct_answer && a === q.correct_answer) correctCount++
+        else wrongCount++
       })
       const resultData = {
         score: finalScore,
@@ -169,13 +170,15 @@ export const ExamInterfacePage = () => {
     let correct = 0
     questions.forEach((q) => {
       const a = answersMap[q.id]
-      if (a && q.correct_answer) {
-        const type = q.type
-        if (type === 'uraian_singkat' || type === 'short_answer' || type === 'essay') {
-          if (isEssayCorrect(a, q.correct_answer)) correct++
-        } else if (Array.isArray(a)) { if (a.sort().join(',') === q.correct_answer) correct++ }
-        else if (a === q.correct_answer) correct++
-      }
+      if (!a) return
+      const type = q.type
+      if (type === 'uraian_singkat' || type === 'short_answer' || type === 'essay') {
+        if (q.correct_answer && isEssayCorrect(a, q.correct_answer)) correct++
+      } else if (type === 'menjodohkan' || type === 'matching') {
+        if (isMatchingCorrect(a, q.matching_pairs)) correct++
+      } else if (Array.isArray(a)) {
+        if (q.correct_answer && a.sort().join(',') === q.correct_answer) correct++
+      } else if (q.correct_answer && a === q.correct_answer) correct++
     })
     return questions.length > 0 ? Math.round((correct / questions.length) * 100) : 0
   }

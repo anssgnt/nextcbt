@@ -4,7 +4,7 @@ import { AdminLayout } from '../layouts/AdminLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { supabase } from '../lib/supabase'
-import { isEssayCorrect } from '../utils/helpers'
+import { isEssayCorrect, isMatchingCorrect } from '../utils/helpers'
 
 export const AdminAnalysis = () => {
   const [loading, setLoading] = useState(true)
@@ -36,12 +36,20 @@ export const AdminAnalysis = () => {
     const qAnswers = answers.filter((a) => a.question_id === q.id)
     const totalAttempts = qAnswers.length
     const correctCount = qAnswers.filter((a) => {
-      if (!q.correct_answer) return false
       const type = q.type
       // Essay/uraian singkat: pakai normalisasi
       if (type === 'uraian_singkat' || type === 'short_answer' || type === 'essay') {
+        if (!q.correct_answer) return false
         return isEssayCorrect(a.answer_text, q.correct_answer)
       }
+      // Menjodohkan: parse jawaban JSON dan bandingkan dengan matching_pairs
+      if (type === 'menjodohkan' || type === 'matching') {
+        try {
+          const parsed = JSON.parse(a.answer_text)
+          return isMatchingCorrect(parsed, q.matching_pairs)
+        } catch { return false }
+      }
+      if (!q.correct_answer) return false
       return a.answer_text === q.correct_answer || q.correct_answer.includes(a.answer_text)
     }).length
 

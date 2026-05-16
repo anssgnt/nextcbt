@@ -4,7 +4,7 @@ import { AdminLayout } from '../layouts/AdminLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { supabase } from '../lib/supabase'
-import { isEssayCorrect } from '../utils/helpers'
+import { isEssayCorrect, isMatchingCorrect } from '../utils/helpers'
 
 export const AdminResults = () => {
   const [results, setResults] = useState([])
@@ -87,19 +87,23 @@ export const AdminResults = () => {
         let correct = 0
         examQuestions.forEach((q) => {
           const ans = sessionAnswers.find((a) => a.question_id === q.id)
-          if (!ans || !q.correct_answer) return
+          if (!ans) return
 
           const type = q.type
           if (type === 'uraian_singkat' || type === 'short_answer' || type === 'essay') {
-            if (isEssayCorrect(ans.answer_text, q.correct_answer)) correct++
+            if (q.correct_answer && isEssayCorrect(ans.answer_text, q.correct_answer)) correct++
+          } else if (type === 'menjodohkan' || type === 'matching') {
+            try {
+              const parsed = JSON.parse(ans.answer_text)
+              if (isMatchingCorrect(parsed, q.matching_pairs)) correct++
+            } catch {}
           } else if (type === 'pilihan_ganda_kompleks' || type === 'multiple_choice_complex') {
-            // Jawaban complex disimpan sebagai comma-separated atau array
             const userAns = Array.isArray(ans.answer_text)
               ? ans.answer_text.sort().join(',')
               : (ans.answer_text || '')
-            if (userAns === q.correct_answer) correct++
+            if (q.correct_answer && userAns === q.correct_answer) correct++
           } else {
-            if (ans.answer_text === q.correct_answer) correct++
+            if (q.correct_answer && ans.answer_text === q.correct_answer) correct++
           }
         })
 

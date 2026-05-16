@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, CheckCircle, XCircle, Loader2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../store'
-import { isEssayCorrect } from '../utils/helpers'
+import { isEssayCorrect, isMatchingCorrect } from '../utils/helpers'
 
 export function ReviewAnswersPage() {
   const { sessionId } = useParams()
@@ -77,11 +77,16 @@ export function ReviewAnswersPage() {
   }
 
   const getIsCorrect = (question, userAnswer) => {
-    if (!userAnswer || !question.correct_answer) return false
+    if (!userAnswer) return false
     const type = question.type
     if (type === 'uraian_singkat' || type === 'short_answer' || type === 'essay') {
+      if (!question.correct_answer) return false
       return isEssayCorrect(userAnswer, question.correct_answer)
     }
+    if (type === 'menjodohkan' || type === 'matching') {
+      return isMatchingCorrect(userAnswer, question.matching_pairs)
+    }
+    if (!question.correct_answer) return false
     if (Array.isArray(userAnswer)) {
       return userAnswer.sort().join(',') === question.correct_answer
     }

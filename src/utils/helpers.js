@@ -24,6 +24,7 @@ export const debounce = (func, delay) => {
  * - Normalisasi spasi ganda jadi satu
  * - Hapus semua tanda baca
  * - Hapus aksen/diakritik
+ * - Normalisasi ejaan Indonesia (oe→u, dj→j, tj→c, j→y untuk nama lama)
  */
 export const normalizeText = (text) => {
   if (!text) return ''
@@ -37,12 +38,19 @@ export const normalizeText = (text) => {
 }
 
 /**
- * Normalisasi lebih agresif: hapus kata sambung umum
+ * Normalisasi lebih agresif: hapus kata sambung + normalisasi ejaan lama Indonesia
  * Digunakan sebagai fallback jika exact match gagal
  */
 const normalizeAggressive = (text) => {
-  const stopWords = ['dan', 'atau', 'yang', 'di', 'ke', 'dari', 'untuk', 'dengan', 'adalah', 'the', 'a', 'an', 'and', 'or', 'of', 'in', 'to']
-  const normalized = normalizeText(text)
+  const stopWords = ['dan', 'atau', 'yang', 'di', 'ke', 'dari', 'untuk', 'dengan', 'adalah', 'the', 'a', 'an', 'and', 'or', 'of', 'in', 'to', 'ir', 'dr', 'prof', 'moh', 'muhammad']
+  let normalized = normalizeText(text)
+  // Normalisasi ejaan lama Indonesia
+  normalized = normalized
+    .replace(/oe/g, 'u')   // Soekarno → Sukarno
+    .replace(/dj/g, 'j')   // Djokjakarta → Jokjakarta
+    .replace(/tj/g, 'c')   // Tjirebon → Cirebon
+    .replace(/nj/g, 'ny')  // Njonja → Nyonya
+    .replace(/sj/g, 'sy')  // Sjahrir → Syahrir
   return normalized
     .split(' ')
     .filter((word) => !stopWords.includes(word))
@@ -102,35 +110,56 @@ export const isEssayCorrect = (userAnswer, correctAnswer) => {
     // Level 1: Exact match setelah normalisasi
     if (userNorm === correctNorm) return true
 
-    // Level 2: Match tanpa kata sambung
-    if (normalizeAggressive(userAnswer) === normalizeAggressive(variant)) return true
+    // Level 2: Match tanpa kata sambung + ejaan lama
+    const userAggr = normalizeAggressive(userAnswer)
+    const correctAggr = normalizeAggressive(variant)
+    if (userAggr === correctAggr) return true
 
-    // Level 3: Similarity check (toleransi typo)
-    // Hanya untuk jawaban pendek (< 50 karakter) agar tidak false positive di jawaban panjang
-    if (correctNorm.length < 50 && userNorm.length < 50) {
-      const sim = similarity(userNorm, correctNorm)
-      if (sim >= 0.85) return true
+    // Level 3: Similarity check pada versi agresif (toleransi typo + ejaan)
+    // Threshold 0.75 untuk toleransi lebih luas (oe/u, typo, dll)
+    if (correctAggr.length < 60 && userAggr.length < 60) {
+      const sim = similarity(userAggr, correctAggr)
+      if (sim >= 0.75) return true
     }
   }
 
   return false
 }
 
+/**
+ * Cek kebenaran jawaban menjodohkan
+ * userAnswer = object {0: "Jakarta", 1: "Tokyo", ...}
+ * question.matching_pairs = [{left: "Indonesia", right: "Jakarta"}, ...]
+ */
+export const isMatchingCorrect = (userAnswer, matchingPairs) => {
+  if (!userAnswer || !matchingPairs || !Array.isArray(matchingPairs)) return false
+  if (typeof userAnswer !== 'object' || Array.isArray(userAnswer)) return false
+
+  return matchingPairs.every((pair, idx) => {
+    const studentAnswer = userAnswer[idx] || userAnswer[String(idx)]
+    if (!studentAnswer) return false
+    return normalizeText(studentAnswer) === normalizeText(pair.right)
+  })
+}
+
 export const calculateScore = (answers, questions) => {
   let correct = 0
   questions.forEach((q) => {
     const userAnswer = answers[q.id]
-    if (!userAnswer || !q.correct_answer) return
+    if (!userAnswer) return
 
     const type = q.type
     if (type === 'uraian_singkat' || type === 'short_answer' || type === 'essay') {
-      // Essay: pakai normalisasi (case-insensitive, trim, dll)
+      if (!q.correct_answer) return
       if (isEssayCorrect(userAnswer, q.correct_answer)) correct++
     } else if (type === 'pilihan_ganda_kompleks' || type === 'multiple_choice_complex') {
-      // Multiple select: sort & join lalu bandingkan
+      if (!q.correct_answer) return
       if (Array.isArray(userAnswer) && userAnswer.sort().join(',') === q.correct_answer) correct++
+    } else if (type === 'menjodohkan' || type === 'matching') {
+      if (isMatchingCorrect(userAnswer, q.matching_pairs)) correct++
     } else {
       // Pilihan ganda, benar/salah, dll: exact match
+      if (!q.correct_answer) return
       if (userAnswer === q.correct_answer) correct++
     }
   })
