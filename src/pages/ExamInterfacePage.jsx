@@ -86,18 +86,32 @@ export const ExamInterfacePage = () => {
           // Random delay 0-3 detik untuk menghindari 1000 siswa hit server bersamaan
           await new Promise((r) => setTimeout(r, Math.random() * 3000))
 
-          // 1. Insert exam_session dan ambil ID-nya (retry up to 2x)
-          let sessionData = null
-          for (let attempt = 0; attempt < 3; attempt++) {
-            try {
-              const { data, error } = await queuedFetch(
-                supabase.from('exam_sessions').insert({
-                  student_id: user?.id, exam_id: examId, status: 'submitted',
-                  score: finalScore, submitted_at: new Date().toISOString(),
-                }).select('id').single()
-              )
-              if (error) throw error
-              sessionData = data
+          // Cek apakah sudah pernah submit ujian ini
+          const { data: existing } = await queuedFetch(
+            supabase.from('exam_sessions')
+              .select('id')
+              .eq('student_id', user?.id)
+              .eq('exam_id', examId)
+              .eq('status', 'submitted')
+              .maybeSingle()
+          )
+
+          if (existing) {
+            // Sudah pernah submit, skip insert, langsung ke result
+            setToast({ type: 'info', message: 'Ujian sudah pernah disubmit' })
+          } else {
+            // 1. Insert exam_session dan ambil ID-nya (retry up to 2x)
+            let sessionData = null
+            for (let attempt = 0; attempt < 3; attempt++) {
+              try {
+                const { data, error } = await queuedFetch(
+                  supabase.from('exam_sessions').insert({
+                    student_id: user?.id, exam_id: examId, status: 'submitted',
+                    score: finalScore, submitted_at: new Date().toISOString(),
+                  }).select('id').single()
+                )
+                if (error) throw error
+                sessionData = data
               break
             } catch (e) {
               if (attempt === 2) throw e
@@ -122,6 +136,7 @@ export const ExamInterfacePage = () => {
               )
             }
           }
+          } // close else (not existing)
         } catch { localStorage.setItem(`pending_submit_${examId}`, JSON.stringify(allAnswers)) }
       } else {
         localStorage.setItem(`pending_submit_${examId}`, JSON.stringify(allAnswers))
