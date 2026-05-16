@@ -81,13 +81,44 @@ export const AdminSettings = () => {
   const handleLogoUpload = (e) => {
     const file = e.target.files[0]
     if (file) {
-      const reader = new FileReader()
-      reader.onload = (event) => {
-        const base64 = event.target.result
-        setSettings(prev => ({ ...prev, logo: base64 }))
-        setLogoFile(file.name)
+      // Upload ke Supabase Storage, simpan URL saja (bukan base64)
+      const uploadLogo = async () => {
+        try {
+          const fileExt = file.name.split('.').pop()
+          const fileName = `school-logo.${fileExt}`
+
+          // Upload file ke storage bucket 'logos'
+          const { error: uploadError } = await supabase.storage
+            .from('logos')
+            .upload(fileName, file, { upsert: true, cacheControl: '3600' })
+
+          if (uploadError) {
+            // Fallback: kalau bucket belum ada atau error, simpan base64 (legacy)
+            const reader = new FileReader()
+            reader.onload = (event) => {
+              setSettings(prev => ({ ...prev, logo: event.target.result }))
+              setLogoFile(file.name)
+            }
+            reader.readAsDataURL(file)
+            return
+          }
+
+          // Ambil public URL
+          const { data: urlData } = supabase.storage.from('logos').getPublicUrl(fileName)
+          const logoUrl = urlData?.publicUrl + '?t=' + Date.now() // cache bust
+          setSettings(prev => ({ ...prev, logo: logoUrl }))
+          setLogoFile(file.name)
+        } catch {
+          // Fallback ke base64 kalau storage error
+          const reader = new FileReader()
+          reader.onload = (event) => {
+            setSettings(prev => ({ ...prev, logo: event.target.result }))
+            setLogoFile(file.name)
+          }
+          reader.readAsDataURL(file)
+        }
       }
-      reader.readAsDataURL(file)
+      uploadLogo()
     }
   }
 
