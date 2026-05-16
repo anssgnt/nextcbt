@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Loader2 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Loader2, Eye } from 'lucide-react'
 import { useAuthStore } from '../store'
 import { supabase } from '../lib/supabase'
 import { StudentLayout } from '../layouts/StudentLayout'
@@ -7,6 +8,7 @@ import { queuedFetch } from '../utils/requestQueue'
 
 export function ResultsPage() {
   const { user } = useAuthStore()
+  const navigate = useNavigate()
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -55,6 +57,12 @@ export function ResultsPage() {
                   <p className="text-xs text-gray-500">Nilai</p>
                 </div>
               </div>
+              <button
+                onClick={() => navigate(`/review/${item.id}`)}
+                className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-100 transition"
+              >
+                <Eye size={16} /> Review Jawaban
+              </button>
             </div>
           ))
         )}

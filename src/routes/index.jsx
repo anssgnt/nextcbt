@@ -22,6 +22,7 @@ const AdminResults = lazy(() => import('../pages/AdminResults').then(m => ({ def
 const AdminSettings = lazy(() => import('../pages/AdminSettings').then(m => ({ default: m.AdminSettings })))
 const AnnouncementsPage = lazy(() => import('../pages/AnnouncementsPage').then(m => ({ default: m.AnnouncementsPage })))
 const ResultsPage = lazy(() => import('../pages/ResultsPage').then(m => ({ default: m.ResultsPage })))
+const ReviewAnswersPage = lazy(() => import('../pages/ReviewAnswersPage').then(m => ({ default: m.ReviewAnswersPage })))
 const ProfilePage = lazy(() => import('../pages/ProfilePage').then(m => ({ default: m.ProfilePage })))
 
 const LoadingFallback = () => (
@@ -51,6 +52,7 @@ export const router = createBrowserRouter([
   { path: "/result/:examId", element: <ProtectedRoute requiredRole="student"><Suspense fallback={<LoadingFallback />}><ResultPage /></Suspense></ProtectedRoute> },
   { path: "/announcements", element: <ProtectedRoute requiredRole="student"><Suspense fallback={<LoadingFallback />}><AnnouncementsPage /></Suspense></ProtectedRoute> },
   { path: "/results", element: <ProtectedRoute requiredRole="student"><Suspense fallback={<LoadingFallback />}><ResultsPage /></Suspense></ProtectedRoute> },
+  { path: "/review/:sessionId", element: <ProtectedRoute requiredRole="student"><Suspense fallback={<LoadingFallback />}><ReviewAnswersPage /></Suspense></ProtectedRoute> },
   { path: "/profile", element: <ProtectedRoute requiredRole="student"><Suspense fallback={<LoadingFallback />}><ProfilePage /></Suspense></ProtectedRoute> },
   { path: "/admin/login", element: <Suspense fallback={<LoadingFallback />}><AdminLogin /></Suspense> },
   { path: "/admin/dashboard", element: <ProtectedRoute requiredRole="admin"><Suspense fallback={<LoadingFallback />}><AdminDashboard /></Suspense></ProtectedRoute> },
