@@ -25,6 +25,7 @@ export const ExamInterfacePage = () => {
   const [showNav, setShowNav] = useState(false)
   const [toast, setToast] = useState(null)
   const [violations, setViolations] = useState(0)
+  const [examMeta, setExamMeta] = useState({})
   const isOnline = useOnlineStatus()
 
   const { timeRemaining, isTimeUp } = useExamTimer(currentExam?.duration)
@@ -45,6 +46,7 @@ export const ExamInterfacePage = () => {
       }
       const examData = JSON.parse(cached)
       setCurrentExam(examData.exam)
+      setExamMeta(examData.meta || {})
       let q = examData.questions || []
       if (examData.meta?.shuffle) q = [...q].sort(() => Math.random() - 0.5)
       // Feature 5: Question limit - randomly pick N questions
@@ -103,8 +105,8 @@ export const ExamInterfacePage = () => {
             }
           }
 
-          // 2. Simpan jawaban per soal ke tabel answers (single batch)
-          if (sessionData?.id) {
+          // 2. Simpan jawaban per soal ke tabel answers (single batch) - hanya jika save_answers ON
+          if (sessionData?.id && examMeta.save_answers) {
             const answersToInsert = Object.entries(allAnswers)
               .filter(([, val]) => val !== null && val !== undefined && val !== '')
               .map(([questionId, answerValue]) => ({

@@ -56,6 +56,12 @@ export function ReviewAnswersPage() {
 
       if (aErr) throw aErr
 
+      // Jika tidak ada jawaban tersimpan di DB
+      if (!aData || aData.length === 0) {
+        setError('Jawaban detail tidak tersedia untuk ujian ini. Fitur "Simpan Jawaban" belum diaktifkan saat ujian berlangsung.')
+        return
+      }
+
       // Map answers by question_id
       const ansMap = {}
       ;(aData || []).forEach((a) => {

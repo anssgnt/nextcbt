@@ -36,6 +36,7 @@ export const AdminSchedule = () => {
     duration: 120,
     kelas: '',
     questions_limit: 0,
+    save_answers: false,
   })
 
   useEffect(() => {
@@ -211,6 +212,7 @@ export const AdminSchedule = () => {
           end_datetime: endDateTime,
           shuffle: form.shuffle,
           questions_limit: form.questions_limit || 0,
+          save_answers: form.save_answers,
         }),
       }
 
@@ -239,6 +241,7 @@ export const AdminSchedule = () => {
         duration: 120,
         kelas: '',
         questions_limit: 0,
+        save_answers: false,
       })
     } catch (err) {
       alert('Gagal menyimpan: ' + err.message)
@@ -372,6 +375,17 @@ export const AdminSchedule = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Jumlah Soal Ditampilkan</label>
                 <input type="number" value={form.questions_limit} onChange={(e) => setForm({ ...form, questions_limit: parseInt(e.target.value) || 0 })} min="0" placeholder="0 = semua soal" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
                 <p className="text-xs text-gray-400 mt-1">0 = tampilkan semua soal dari bank. Jika diisi (misal 30), hanya 30 soal acak yang ditampilkan ke siswa.</p>
+              </div>
+
+              {/* Simpan Jawaban ke Database */}
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" checked={form.save_answers} onChange={(e) => setForm({ ...form, save_answers: e.target.checked })} className="w-5 h-5 text-amber-600 rounded" />
+                  <div>
+                    <span className="text-sm font-medium text-gray-700">Simpan Jawaban ke Database (Review Jawaban)</span>
+                    <p className="text-xs text-gray-500 mt-0.5">ON = siswa bisa review jawaban benar/salah per soal setelah ujian. OFF = hemat resource, cocok untuk ujian banyak peserta (500+ siswa).</p>
+                  </div>
+                </label>
               </div>
 
               {/* Actions */}
@@ -565,6 +579,7 @@ export const AdminSchedule = () => {
                                     duration: exam.duration || 120,
                                     kelas: m.kelas || '',
                                     questions_limit: m.questions_limit || 0,
+                                    save_answers: m.save_answers || false,
                                   })
                                   setEditId(exam.id)
                                   setShowForm(true)
