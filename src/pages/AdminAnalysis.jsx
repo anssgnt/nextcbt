@@ -4,6 +4,7 @@ import { AdminLayout } from '../layouts/AdminLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { supabase } from '../lib/supabase'
+import { isEssayCorrect } from '../utils/helpers'
 
 export const AdminAnalysis = () => {
   const [loading, setLoading] = useState(true)
@@ -36,6 +37,11 @@ export const AdminAnalysis = () => {
     const totalAttempts = qAnswers.length
     const correctCount = qAnswers.filter((a) => {
       if (!q.correct_answer) return false
+      const type = q.type
+      // Essay/uraian singkat: pakai normalisasi
+      if (type === 'uraian_singkat' || type === 'short_answer' || type === 'essay') {
+        return isEssayCorrect(a.answer_text, q.correct_answer)
+      }
       return a.answer_text === q.correct_answer || q.correct_answer.includes(a.answer_text)
     }).length
 

@@ -1,15 +1,18 @@
 ﻿import { useState, useEffect } from 'react'
-import { Download, Filter, BarChart2, TrendingUp, Users, Award, Loader2 } from 'lucide-react'
+import { Download, Filter, BarChart2, TrendingUp, Users, Award, Loader2, RefreshCw } from 'lucide-react'
 import { AdminLayout } from '../layouts/AdminLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { supabase } from '../lib/supabase'
+import { isEssayCorrect } from '../utils/helpers'
 
 export const AdminResults = () => {
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedExam, setSelectedExam] = useState('all')
   const [activeTab, setActiveTab] = useState('results')
+  const [regrading, setRegrading] = useState(false)
+  const [regradeResult, setRegradeResult] = useState(null)
 
   useEffect(() => {
     loadResults()
@@ -44,6 +47,94 @@ export const AdminResults = () => {
 
   const exams = [...new Set(results.map((r) => r.exam))]
   const filteredResults = selectedExam === 'all' ? results : results.filter((r) => r.exam === selectedExam)
+
+  // Re-grade: hitung ulang semua nilai dengan algoritma normalisasi baru
+  const handleReGradeAll = async () => {
+    if (!confirm('Re-grade akan menghitung ulang SEMUA nilai siswa dengan algoritma koreksi terbaru (case-insensitive untuk essay). Lanjutkan?')) return
+    setRegrading(true)
+    setRegradeResult(null)
+    try {
+      // 1. Ambil semua session yang submitted
+      const { data: sessions, error: sessErr } = await supabase
+        .from('exam_sessions')
+        .select('id, exam_id, score')
+        .eq('status', 'submitted')
+      if (sessErr) throw sessErr
+
+      // 2. Ambil semua soal (dengan correct_answer)
+      const { data: allQuestions, error: qErr } = await supabase
+        .from('questions')
+        .select('id, exam_id, type, correct_answer')
+      if (qErr) throw qErr
+
+      // 3. Ambil semua jawaban
+      const { data: allAnswers, error: aErr } = await supabase
+        .from('answers')
+        .select('session_id, question_id, answer_text')
+      if (aErr) throw aErr
+
+      // 4. Hitung ulang per session
+      let updatedCount = 0
+      let changedCount = 0
+      const updates = []
+
+      for (const session of (sessions || [])) {
+        const examQuestions = allQuestions.filter((q) => q.exam_id === session.exam_id)
+        if (examQuestions.length === 0) continue
+
+        const sessionAnswers = allAnswers.filter((a) => a.session_id === session.id)
+
+        let correct = 0
+        examQuestions.forEach((q) => {
+          const ans = sessionAnswers.find((a) => a.question_id === q.id)
+          if (!ans || !q.correct_answer) return
+
+          const type = q.type
+          if (type === 'uraian_singkat' || type === 'short_answer' || type === 'essay') {
+            if (isEssayCorrect(ans.answer_text, q.correct_answer)) correct++
+          } else if (type === 'pilihan_ganda_kompleks' || type === 'multiple_choice_complex') {
+            // Jawaban complex disimpan sebagai comma-separated atau array
+            const userAns = Array.isArray(ans.answer_text)
+              ? ans.answer_text.sort().join(',')
+              : (ans.answer_text || '')
+            if (userAns === q.correct_answer) correct++
+          } else {
+            if (ans.answer_text === q.correct_answer) correct++
+          }
+        })
+
+        const newScore = Math.round((correct / examQuestions.length) * 100)
+        updatedCount++
+
+        if (newScore !== session.score) {
+          changedCount++
+          updates.push({ id: session.id, score: newScore })
+        }
+      }
+
+      // 5. Batch update scores yang berubah
+      for (const upd of updates) {
+        await supabase
+          .from('exam_sessions')
+          .update({ score: upd.score })
+          .eq('id', upd.id)
+      }
+
+      setRegradeResult({
+        total: updatedCount,
+        changed: changedCount,
+        success: true,
+      })
+
+      // Reload data
+      await loadResults()
+    } catch (err) {
+      console.error('Re-grade error:', err)
+      setRegradeResult({ success: false, error: err.message })
+    } finally {
+      setRegrading(false)
+    }
+  }
 
   const handleExportResults = () => {
     const csv = [
@@ -123,6 +214,10 @@ export const AdminResults = () => {
             <p className="text-sm text-gray-600">Data dari Supabase</p>
           </div>
           <div className="flex gap-2">
+            <button onClick={handleReGradeAll} disabled={regrading} className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+              {regrading ? <Loader2 size={18} className="animate-spin" /> : <RefreshCw size={18} />}
+              {regrading ? 'Re-grading...' : 'Re-Grade Semua'}
+            </button>
             <button onClick={handlePrintResults} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
               <Download size={18} /> Cetak Hasil
             </button>
@@ -137,6 +232,26 @@ export const AdminResults = () => {
           <button onClick={() => setActiveTab('results')} className={`px-4 py-2 rounded-md text-sm font-medium transition ${activeTab === 'results' ? 'bg-white shadow text-blue-600' : 'text-gray-600'}`}>Hasil Ujian</button>
           <button onClick={() => setActiveTab('analytics')} className={`px-4 py-2 rounded-md text-sm font-medium transition ${activeTab === 'analytics' ? 'bg-white shadow text-blue-600' : 'text-gray-600'}`}>Analitik</button>
         </div>
+
+        {/* Re-grade Result Banner */}
+        {regradeResult && (
+          <div className={`mb-4 p-4 rounded-lg border ${regradeResult.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+            {regradeResult.success ? (
+              <div className="flex items-center gap-2">
+                <RefreshCw size={18} className="text-green-600" />
+                <p className="text-sm text-green-800">
+                  <span className="font-semibold">Re-grade selesai!</span> {regradeResult.total} sesi diperiksa, <span className="font-bold">{regradeResult.changed} nilai diperbarui</span>.
+                </p>
+                <button onClick={() => setRegradeResult(null)} className="ml-auto text-green-600 hover:text-green-800 text-sm">✕</button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <p className="text-sm text-red-800"><span className="font-semibold">Gagal re-grade:</span> {regradeResult.error}</p>
+                <button onClick={() => setRegradeResult(null)} className="ml-auto text-red-600 hover:text-red-800 text-sm">✕</button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">

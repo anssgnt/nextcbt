@@ -17,11 +17,51 @@ export const debounce = (func, delay) => {
   }
 }
 
+/**
+ * Normalisasi teks untuk perbandingan essay/uraian singkat
+ * - Trim spasi awal/akhir
+ * - Lowercase
+ * - Normalisasi spasi ganda jadi satu
+ * - Hapus tanda baca di akhir
+ */
+export const normalizeText = (text) => {
+  if (!text) return ''
+  return text
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')       // spasi ganda → satu spasi
+    .replace(/[.,;:!?]+$/, '')  // hapus tanda baca di akhir
+    .trim()
+}
+
+/**
+ * Cek kebenaran jawaban essay/uraian singkat dengan toleransi:
+ * - Case insensitive
+ * - Trim whitespace
+ * - Normalisasi spasi ganda
+ * - Abaikan tanda baca di akhir
+ */
+export const isEssayCorrect = (userAnswer, correctAnswer) => {
+  if (!userAnswer || !correctAnswer) return false
+  return normalizeText(userAnswer) === normalizeText(correctAnswer)
+}
+
 export const calculateScore = (answers, questions) => {
   let correct = 0
   questions.forEach((q) => {
-    if (q.type === 'multiple_choice' && answers[q.id] === q.correct_answer) {
-      correct++
+    const userAnswer = answers[q.id]
+    if (!userAnswer || !q.correct_answer) return
+
+    const type = q.type
+    if (type === 'uraian_singkat' || type === 'short_answer' || type === 'essay') {
+      // Essay: pakai normalisasi (case-insensitive, trim, dll)
+      if (isEssayCorrect(userAnswer, q.correct_answer)) correct++
+    } else if (type === 'pilihan_ganda_kompleks' || type === 'multiple_choice_complex') {
+      // Multiple select: sort & join lalu bandingkan
+      if (Array.isArray(userAnswer) && userAnswer.sort().join(',') === q.correct_answer) correct++
+    } else {
+      // Pilihan ganda, benar/salah, dll: exact match
+      if (userAnswer === q.correct_answer) correct++
     }
   })
   return Math.round((correct / questions.length) * 100)

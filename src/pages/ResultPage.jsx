@@ -2,6 +2,7 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { Button } from '../components'
 import { CheckCircle, XCircle, Home, ArrowLeft } from 'lucide-react'
+import { isEssayCorrect } from '../utils/helpers'
 
 export const ResultPage = () => {
   const { examId } = useParams()
@@ -116,6 +117,11 @@ export const ResultPage = () => {
 
 function getIsCorrect(question, userAnswer) {
   if (!userAnswer || !question.correct_answer) return false
+  const type = question.type
+  // Essay/uraian singkat: pakai normalisasi (case-insensitive, trim, dll)
+  if (type === 'uraian_singkat' || type === 'short_answer' || type === 'essay') {
+    return isEssayCorrect(userAnswer, question.correct_answer)
+  }
   if (Array.isArray(userAnswer)) {
     return userAnswer.sort().join(',') === question.correct_answer
   }

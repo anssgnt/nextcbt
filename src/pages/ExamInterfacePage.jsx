@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Button, Modal, Toast } from '../components'
 import { useExamStore, useAuthStore } from '../store'
 import { useExamTimer, useTabVisibility, useOnlineStatus } from '../hooks/useExam'
-import { formatTime, debounce } from '../utils/helpers'
+import { formatTime, debounce, isEssayCorrect } from '../utils/helpers'
 import { List, ChevronLeft, ChevronRight } from 'lucide-react'
 
 export const ExamInterfacePage = () => {
@@ -128,7 +128,10 @@ export const ExamInterfacePage = () => {
     questions.forEach((q) => {
       const a = answersMap[q.id]
       if (a && q.correct_answer) {
-        if (Array.isArray(a)) { if (a.sort().join(',') === q.correct_answer) correct++ }
+        const type = q.type
+        if (type === 'uraian_singkat' || type === 'short_answer' || type === 'essay') {
+          if (isEssayCorrect(a, q.correct_answer)) correct++
+        } else if (Array.isArray(a)) { if (a.sort().join(',') === q.correct_answer) correct++ }
         else if (a === q.correct_answer) correct++
       }
     })
