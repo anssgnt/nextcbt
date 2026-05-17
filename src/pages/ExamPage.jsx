@@ -35,6 +35,23 @@ export const ExamPage = () => {
       const map = {}
       ;(data || []).forEach((s) => { map[s.exam_id] = true })
       setCompletedExams(map)
+
+      // Sync localStorage dengan data terbaru dari server
+      // Hapus completed_exams yang sudah tidak ada di DB (remidi)
+      const oldCompleted = JSON.parse(localStorage.getItem('completed_exams') || '{}')
+      const newCompleted = {}
+      Object.keys(oldCompleted).forEach((examId) => {
+        if (map[examId]) newCompleted[examId] = oldCompleted[examId]
+      })
+      localStorage.setItem('completed_exams', JSON.stringify(newCompleted))
+
+      // Hapus cache result & answers untuk ujian yang sudah di-remidi
+      Object.keys(oldCompleted).forEach((examId) => {
+        if (!map[examId]) {
+          localStorage.removeItem(`exam_result_${examId}`)
+          localStorage.removeItem(`answers_${examId}`)
+        }
+      })
     } catch {
       // Fallback ke localStorage jika offline
       try { setCompletedExams(JSON.parse(localStorage.getItem('completed_exams') || '{}')) } catch {}
