@@ -1,4 +1,5 @@
 ﻿import react from '@vitejs/plugin-react'
+import legacy from '@vitejs/plugin-legacy'
 import { defineConfig } from 'vite'
 import { writeFileSync } from 'fs'
 import { resolve } from 'path'
@@ -106,7 +107,14 @@ self.addEventListener('sync', (event) => {
 }
 
 export default defineConfig({
-  plugins: [react(), swVersionPlugin()],
+  plugins: [
+    react(),
+    legacy({
+      targets: ['defaults', 'not IE 11', 'chrome >= 63', 'safari >= 11', 'android >= 5'],
+      additionalLegacyPolyfills: ['regenerator-runtime/runtime'],
+    }),
+    swVersionPlugin(),
+  ],
   build: {
     target: ['es2015', 'chrome63', 'safari11'],
     minify: 'terser',
