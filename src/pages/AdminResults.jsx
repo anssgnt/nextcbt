@@ -13,10 +13,20 @@ export const AdminResults = () => {
   const [activeTab, setActiveTab] = useState('results')
   const [regrading, setRegrading] = useState(false)
   const [regradeResult, setRegradeResult] = useState(null)
+  const [students, setStudents] = useState([])
+  const [classReportExam, setClassReportExam] = useState('')
 
   useEffect(() => {
     loadResults()
+    loadStudents()
   }, [])
+
+  const loadStudents = async () => {
+    try {
+      const { data } = await supabase.from('students').select('id, name, nis, class_name')
+      setStudents(data || [])
+    } catch {}
+  }
 
   const loadResults = async () => {
     setLoading(true)
@@ -31,6 +41,8 @@ export const AdminResults = () => {
 
       const mapped = (data || []).map((r) => ({
         id: r.id,
+        studentId: r.student_id,
+        examId: r.exam_id,
         studentName: r.students?.name || '-',
         exam: r.exams?.title || '-',
         score: r.score || 0,
@@ -235,6 +247,7 @@ export const AdminResults = () => {
         <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-lg w-fit">
           <button onClick={() => setActiveTab('results')} className={`px-4 py-2 rounded-md text-sm font-medium transition ${activeTab === 'results' ? 'bg-white shadow text-blue-600' : 'text-gray-600'}`}>Hasil Ujian</button>
           <button onClick={() => setActiveTab('analytics')} className={`px-4 py-2 rounded-md text-sm font-medium transition ${activeTab === 'analytics' ? 'bg-white shadow text-blue-600' : 'text-gray-600'}`}>Analitik</button>
+          <button onClick={() => setActiveTab('classReport')} className={`px-4 py-2 rounded-md text-sm font-medium transition ${activeTab === 'classReport' ? 'bg-white shadow text-blue-600' : 'text-gray-600'}`}>Laporan Kelas</button>
         </div>
 
         {/* Re-grade Result Banner */}
@@ -357,6 +370,139 @@ export const AdminResults = () => {
             </Card>
           </div>
         )}
+
+        {activeTab === 'classReport' && (() => {
+          // Group students by class
+          const classes = [...new Set(students.map((s) => s.class_name).filter(Boolean))].sort()
+          const selectedExamForReport = classReportExam || exams[0] || ''
+
+          // Get student IDs who submitted this exam
+          const submittedStudentIds = results
+            .filter((r) => r.exam === selectedExamForReport)
+            .map((r) => r.studentId)
+
+          // Build class report
+          const classData = classes.map((className) => {
+            const classStudents = students.filter((s) => s.class_name === className)
+            const sudahUjian = classStudents.filter((s) => submittedStudentIds.includes(s.id))
+            const belumUjian = classStudents.filter((s) => !submittedStudentIds.includes(s.id))
+            const avgScore = sudahUjian.length > 0
+              ? Math.round(results.filter((r) => r.exam === selectedExamForReport && sudahUjian.map((s) => s.id).includes(r.studentId)).reduce((sum, r) => sum + r.score, 0) / sudahUjian.length)
+              : 0
+
+            return { className, total: classStudents.length, sudah: sudahUjian.length, belum: belumUjian.length, avgScore, belumList: belumUjian }
+          })
+
+          return (
+            <div className="space-y-4">
+              {/* Exam selector */}
+              <Card>
+                <CardContent className="pt-4 pb-4">
+                  <div className="flex items-center gap-4">
+                    <label className="text-sm font-medium text-gray-700">Pilih Ujian:</label>
+                    <select
+                      value={selectedExamForReport}
+                      onChange={(e) => setClassReportExam(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm flex-1"
+                    >
+                      {exams.map((exam) => <option key={exam} value={exam}>{exam}</option>)}
+                    </select>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Summary cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card>
+                  <CardContent className="pt-4 pb-4">
+                    <div className="flex items-center gap-3">
+                      <Users size={20} className="text-blue-600" />
+                      <div>
+                        <p className="text-xs text-gray-500">Total Siswa</p>
+                        <p className="text-2xl font-bold">{students.length}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-4 pb-4">
+                    <div className="flex items-center gap-3">
+                      <Award size={20} className="text-green-600" />
+                      <div>
+                        <p className="text-xs text-gray-500">Sudah Ujian</p>
+                        <p className="text-2xl font-bold text-green-600">{classData.reduce((s, c) => s + c.sudah, 0)}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-4 pb-4">
+                    <div className="flex items-center gap-3">
+                      <Users size={20} className="text-red-600" />
+                      <div>
+                        <p className="text-xs text-gray-500">Belum Ujian</p>
+                        <p className="text-2xl font-bold text-red-600">{classData.reduce((s, c) => s + c.belum, 0)}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Per-class table */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Rekap Per Kelas — {selectedExamForReport || 'Pilih ujian'}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {classData.length === 0 ? (
+                    <p className="text-center text-gray-500 py-8">Belum ada data kelas</p>
+                  ) : (
+                    <div className="space-y-4">
+                      {classData.map((cls) => (
+                        <div key={cls.className} className="border rounded-lg overflow-hidden">
+                          <div className="flex items-center justify-between px-4 py-3 bg-gray-50">
+                            <div className="flex items-center gap-3">
+                              <span className="font-bold text-gray-800">{cls.className}</span>
+                              <span className="text-xs text-gray-500">({cls.total} siswa)</span>
+                            </div>
+                            <div className="flex items-center gap-4 text-xs">
+                              <span className="text-green-700 font-semibold">✓ {cls.sudah} sudah</span>
+                              <span className="text-red-700 font-semibold">✗ {cls.belum} belum</span>
+                              {cls.avgScore > 0 && <span className="text-blue-700 font-semibold">Rata-rata: {cls.avgScore}</span>}
+                            </div>
+                          </div>
+                          {/* Progress bar */}
+                          <div className="px-4 py-2">
+                            <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                              <div
+                                className="h-2 bg-green-500 rounded-full transition-all"
+                                style={{ width: cls.total > 0 ? `${(cls.sudah / cls.total) * 100}%` : '0%' }}
+                              ></div>
+                            </div>
+                            <p className="text-[10px] text-gray-400 mt-1">{cls.total > 0 ? Math.round((cls.sudah / cls.total) * 100) : 0}% selesai</p>
+                          </div>
+                          {/* Daftar yang belum ujian */}
+                          {cls.belum > 0 && (
+                            <div className="px-4 pb-3">
+                              <p className="text-xs font-medium text-red-600 mb-1">Belum mengerjakan:</p>
+                              <div className="flex flex-wrap gap-1">
+                                {cls.belumList.map((s) => (
+                                  <span key={s.id} className="px-2 py-0.5 bg-red-50 text-red-700 text-[11px] rounded border border-red-100">
+                                    {s.name}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )
+        })()}
       </div>
     </AdminLayout>
   )
