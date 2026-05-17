@@ -11,17 +11,17 @@ if ('serviceWorker' in navigator) {
         updateViaCache: 'none', // Always check for SW updates
       })
 
-      // Check for updates every 60 seconds
-      setInterval(() => registration.update(), 60 * 1000)
+      // Check for updates every 30 seconds
+      setInterval(() => registration.update(), 30 * 1000)
 
       // When new SW is waiting, activate it immediately
       registration.addEventListener('updatefound', () => {
         const newWorker = registration.installing
         if (newWorker) {
           newWorker.addEventListener('statechange', () => {
-            if (newWorker.state === 'activated') {
-              // New version available, reload to get fresh content
-              window.location.reload()
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              // New version available, skip waiting and reload
+              newWorker.postMessage({ type: 'SKIP_WAITING' })
             }
           })
         }
