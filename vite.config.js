@@ -108,7 +108,7 @@ self.addEventListener('sync', (event) => {
 export default defineConfig({
   plugins: [react(), swVersionPlugin()],
   build: {
-    target: 'esnext',
+    target: ['es2015', 'chrome63', 'safari11'],
     minify: 'terser',
     terserOptions: {
       compress: {
