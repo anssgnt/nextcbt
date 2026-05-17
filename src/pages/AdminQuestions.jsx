@@ -80,7 +80,7 @@ export const AdminQuestions = () => {
     return allRows.map((row) => {
       const type = (row.Tipe || '').toLowerCase().trim()
       const q = {
-        subject: row['Mata Pelajaran'] || newBankName || '',
+        subject: newBankName || row['Mata Pelajaran'] || '',
         text: row.Soal || '',
         type,
         exam: row.Ujian || '',
