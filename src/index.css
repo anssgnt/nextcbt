@@ -2,6 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
+/* iOS viewport height fix */
+@supports (height: 100dvh) {
+  :root { --vh-full: 100dvh; }
+}
+@supports not (height: 100dvh) {
+  :root { --vh-full: 100vh; }
+}
+
+/* Prevent iOS bounce/overscroll during exam */
+html, body {
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+}
+
 @keyframes slide-in {
   from { transform: translateX(100%); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }

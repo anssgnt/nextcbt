@@ -114,8 +114,12 @@ export const ExamPage = () => {
       setTokenError('Token tidak valid')
       return
     }
-    // Token valid → fullscreen + mulai
-    try { document.documentElement.requestFullscreen?.() } catch {}
+    // Token valid → fullscreen + mulai (iOS tidak support, skip gracefully)
+    try {
+      const el = document.documentElement
+      if (el.requestFullscreen) el.requestFullscreen()
+      else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen()
+    } catch {}
 
     if (syncedExams[tokenModal.id]) {
       setTokenModal(null)

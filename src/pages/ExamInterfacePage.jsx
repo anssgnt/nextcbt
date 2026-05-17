@@ -59,6 +59,27 @@ export const ExamInterfacePage = () => {
     return () => clearInterval(timer)
   }, [showWarning, warningCountdown > 0])
 
+  // Prevent back button during exam (Android)
+  useEffect(() => {
+    const preventBack = () => {
+      window.history.pushState(null, '', window.location.href)
+    }
+    window.history.pushState(null, '', window.location.href)
+    window.addEventListener('popstate', preventBack)
+    return () => window.removeEventListener('popstate', preventBack)
+  }, [])
+
+  // Prevent accidental page close/refresh
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      e.preventDefault()
+      e.returnValue = 'Ujian sedang berlangsung. Yakin ingin keluar?'
+      return e.returnValue
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [])
+
   useEffect(() => {
     try {
       const cached = localStorage.getItem(`exam_data_${examId}`)
@@ -341,7 +362,7 @@ export const ExamInterfacePage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-16">
+    <div className="min-h-[100dvh] bg-gray-50 pb-16">
       {/* Header - blue gradient */}
       <div className="sticky top-0 z-40 bg-gradient-to-r from-blue-600 to-blue-500 text-white px-4 py-3">
         <div className="flex items-center justify-between">
