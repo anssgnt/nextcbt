@@ -4,6 +4,7 @@ import { Button, Modal, Toast } from '../components'
 import { useExamStore, useAuthStore } from '../store'
 import { useExamTimer, useTabVisibility, useOnlineStatus } from '../hooks/useExam'
 import { formatTime, debounce, isEssayCorrect, isMatchingCorrect } from '../utils/helpers'
+import { RichText } from '../components/RichText'
 import { List, ChevronLeft, ChevronRight } from 'lucide-react'
 
 export const ExamInterfacePage = () => {
@@ -294,8 +295,8 @@ export const ExamInterfacePage = () => {
         <div className="space-y-2">
           {opts.map((opt) => (
             <label key={opt.id} className={`flex items-center p-3 border-2 rounded-xl cursor-pointer transition ${currentAnswer === opt.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
-              <input type="radio" name={`q-${currentQuestion.id}`} value={opt.id} checked={currentAnswer === opt.id} onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)} className="w-4 h-4 text-blue-600" />
-              <span className="ml-3 text-sm">{opt.text || opt.option_text}</span>
+              <input type="radio" name={`q-${currentQuestion.id}`} value={opt.id} checked={currentAnswer === opt.id} onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)} className="w-4 h-4 text-blue-600 flex-shrink-0" />
+              <span className="ml-3 text-sm"><RichText text={opt.text || opt.option_text} /></span>
             </label>
           ))}
         </div>
@@ -312,8 +313,8 @@ export const ExamInterfacePage = () => {
               <input type="checkbox" value={opt.id} checked={(currentAnswer || []).includes(opt.id)} onChange={(e) => {
                 const sel = currentAnswer || []
                 handleAnswerChange(currentQuestion.id, e.target.checked ? [...sel, opt.id] : sel.filter((x) => x !== opt.id))
-              }} className="w-4 h-4 text-blue-600 rounded" />
-              <span className="ml-3 text-sm">{opt.text || opt.option_text}</span>
+              }} className="w-4 h-4 text-blue-600 rounded flex-shrink-0" />
+              <span className="ml-3 text-sm"><RichText text={opt.text || opt.option_text} /></span>
             </label>
           ))}
         </div>
@@ -432,7 +433,7 @@ export const ExamInterfacePage = () => {
       {/* Question Content */}
       <div className="px-4 py-4">
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-          <p className="text-sm font-medium text-gray-900 mb-4">{currentQuestion.question_text}</p>
+          <RichText text={currentQuestion.question_text} className="text-sm font-medium text-gray-900 mb-4 block" />
           {currentQuestion.image_url && <img src={currentQuestion.image_url} alt="" className="max-w-full rounded-lg mb-4" />}
           {renderQuestion()}
         </div>

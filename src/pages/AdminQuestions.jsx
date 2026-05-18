@@ -546,9 +546,17 @@ export const AdminQuestions = () => {
                     <textarea
                       value={editingQuestion.question_text}
                       onChange={(e) => setEditingQuestion({ ...editingQuestion, question_text: e.target.value })}
-                      rows={3}
+                      rows={4}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      dir="auto"
                     />
+                    <div className="mt-1 p-2 bg-gray-50 rounded text-[10px] text-gray-500 space-y-0.5">
+                      <p><b>Format khusus:</b></p>
+                      <p>• Gambar: <code className="bg-white px-1 rounded">[img:https://link-gambar.png]</code></p>
+                      <p>• Arab/Quran: <code className="bg-white px-1 rounded">[ar:بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ]</code></p>
+                      <p>• Matematika: <code className="bg-white px-1 rounded">[math:sqrt(x^2+y^2)]</code></p>
+                      <p>• Atau langsung paste teks Arab/simbol Unicode: √ ² ³ π ≤ ≥ ± ∞</p>
+                    </div>
                   </div>
 
                   {/* Opsi (PG / PG Kompleks) */}
