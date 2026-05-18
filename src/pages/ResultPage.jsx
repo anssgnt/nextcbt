@@ -39,7 +39,35 @@ export const ResultPage = () => {
     )
   }
 
-  const { score, correctCount, wrongCount, totalQuestions, questions, answers, examTitle } = result
+  const { score, correctCount, wrongCount, totalQuestions, questions, answers, examTitle, scoreHidden } = result
+
+  // Jika nilai disembunyikan
+  if (scoreHidden) {
+    return (
+      <div className="min-h-screen bg-gray-50 pb-8">
+        <div className="bg-gradient-to-r from-blue-600 to-blue-500 text-white px-4 py-5">
+          <button onClick={() => navigate('/student/exams')} className="flex items-center gap-1 text-blue-100 text-sm mb-2">
+            <ArrowLeft size={16} /> Kembali
+          </button>
+          <h1 className="text-lg font-bold">Ujian Selesai</h1>
+          {examTitle && <p className="text-blue-100 text-sm mt-0.5">{examTitle}</p>}
+        </div>
+        <div className="px-4 -mt-2">
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 text-center">
+            <p className="text-4xl mb-3">✅</p>
+            <h2 className="text-lg font-bold text-gray-800 mb-2">Jawaban Berhasil Dikirim</h2>
+            <p className="text-sm text-gray-600 mb-1">Nilai akan diumumkan oleh guru.</p>
+            <p className="text-xs text-gray-400">Jumlah soal: {totalQuestions}</p>
+          </div>
+        </div>
+        <div className="px-4 mt-6">
+          <Button onClick={() => navigate('/student/exams')} className="w-full flex items-center justify-center gap-2">
+            <Home size={18} /> Kembali ke Daftar Ujian
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 pb-8">

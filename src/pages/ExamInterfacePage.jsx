@@ -106,6 +106,12 @@ export const ExamInterfacePage = () => {
         }
       }
 
+      // Jika show_score OFF, strip kunci jawaban dari memori (keamanan)
+      const showScore = examData.meta?.show_score !== false
+      if (!showScore) {
+        q = q.map(({ correct_answer, matching_pairs, ...rest }) => rest)
+      }
+
       setQuestions(q)
 
       // Restore answers dari localStorage (survive crash/refresh)
@@ -220,14 +226,16 @@ export const ExamInterfacePage = () => {
         } else if (q.correct_answer && a === q.correct_answer) correctCount++
         else wrongCount++
       })
+      const showScore = examMeta.show_score !== false
       const resultData = {
-        score: finalScore,
-        correctCount,
-        wrongCount,
+        score: showScore ? finalScore : null,
+        correctCount: showScore ? correctCount : null,
+        wrongCount: showScore ? wrongCount : null,
         totalQuestions: questions.length,
-        questions,
-        answers: allAnswers,
+        questions: showScore ? questions : [], // Jangan simpan soal+kunci jika hidden
+        answers: showScore ? allAnswers : {},
         examTitle: currentExam?.title || '',
+        scoreHidden: !showScore,
       }
       localStorage.setItem(`exam_result_${examId}`, JSON.stringify(resultData))
 

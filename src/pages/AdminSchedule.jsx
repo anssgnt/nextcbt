@@ -37,6 +37,7 @@ export const AdminSchedule = () => {
     kelas: '',
     questions_limit: 0,
     save_answers: false,
+    show_score: true,
     komposisi_pg: 0,
     komposisi_pg_kompleks: 0,
     komposisi_benar_salah: 0,
@@ -288,6 +289,7 @@ export const AdminSchedule = () => {
           shuffle: form.shuffle,
           questions_limit: form.questions_limit || 0,
           save_answers: form.save_answers,
+          show_score: form.show_score,
           komposisi: {
             pilihan_ganda: form.komposisi_pg || 0,
             pilihan_ganda_kompleks: form.komposisi_pg_kompleks || 0,
@@ -324,6 +326,7 @@ export const AdminSchedule = () => {
         kelas: '',
         questions_limit: 0,
         save_answers: false,
+        show_score: true,
         komposisi_pg: 0,
         komposisi_pg_kompleks: 0,
         komposisi_benar_salah: 0,
@@ -502,6 +505,17 @@ export const AdminSchedule = () => {
                   <div>
                     <span className="text-sm font-medium text-gray-700">Simpan Jawaban ke Database (Review Jawaban)</span>
                     <p className="text-xs text-gray-500 mt-0.5">ON = siswa bisa review jawaban benar/salah per soal setelah ujian. OFF = hemat resource, cocok untuk ujian banyak peserta (500+ siswa).</p>
+                  </div>
+                </label>
+              </div>
+
+              {/* Tampilkan Nilai Langsung */}
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" checked={form.show_score} onChange={(e) => setForm({ ...form, show_score: e.target.checked })} className="w-5 h-5 text-red-600 rounded" />
+                  <div>
+                    <span className="text-sm font-medium text-gray-700">Tampilkan Nilai Langsung ke Siswa</span>
+                    <p className="text-xs text-gray-500 mt-0.5">ON = siswa langsung lihat nilai setelah submit (⚠️ kunci jawaban tersimpan di HP). OFF = nilai disembunyikan, admin Re-Grade manual (lebih aman).</p>
                   </div>
                 </label>
               </div>
@@ -703,6 +717,7 @@ export const AdminSchedule = () => {
                                     kelas: m.kelas || '',
                                     questions_limit: m.questions_limit || 0,
                                     save_answers: m.save_answers || false,
+                                    show_score: m.show_score !== false, // default true for backward compat
                                     komposisi_pg: m.komposisi?.pilihan_ganda || 0,
                                     komposisi_pg_kompleks: m.komposisi?.pilihan_ganda_kompleks || 0,
                                     komposisi_benar_salah: m.komposisi?.benar_salah || 0,
