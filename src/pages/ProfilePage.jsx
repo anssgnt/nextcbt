@@ -39,53 +39,31 @@ export function ProfilePage() {
           <LogOut size={20} /> Logout
         </button>
 
-        {/* Hapus Sync */}
-        <button
-          onClick={() => {
-            if (confirm('Hapus data sync? Anda perlu sync ulang sebelum ujian.')) {
-              const keys = Object.keys(localStorage).filter((k) =>
-                k.startsWith('exam_data_') || k.startsWith('answers_') || k.startsWith('pending_submit_') ||
-                k === 'synced_exams' || k === 'exam_versions'
-              )
-              keys.forEach((k) => localStorage.removeItem(k))
-              alert('Data sync dihapus. Silakan sync ulang.')
-            }
-          }}
-          className="w-full mt-3 bg-gray-100 text-gray-600 py-3 rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-gray-200 transition text-sm"
-        >
-          🔄 Reset Sync
-        </button>
-        <p className="text-[10px] text-gray-400 text-center mt-1">Hanya menghapus soal offline. Status ujian dikontrol admin.</p>
-
-        {/* Reset Aplikasi Total */}
+        {/* Reset Aplikasi */}
         <button
           onClick={async () => {
-            if (!confirm('Reset aplikasi akan menghapus SEMUA data lokal (cache, sync, hasil). Anda perlu login ulang. Lanjutkan?')) return
+            if (!confirm('Reset aplikasi akan menghapus semua data lokal. Anda perlu login & sync ulang. Lanjutkan?')) return
             try {
-              // 1. Unregister service workers
               if ('serviceWorker' in navigator) {
                 const registrations = await navigator.serviceWorker.getRegistrations()
                 await Promise.all(registrations.map((r) => r.unregister()))
               }
-              // 2. Clear all caches
               if ('caches' in window) {
                 const keys = await caches.keys()
                 await Promise.all(keys.map((k) => caches.delete(k)))
               }
-              // 3. Clear localStorage (kecuali auth)
               localStorage.clear()
-              // 4. Reload
               window.location.href = '/student/login'
             } catch {
               localStorage.clear()
               window.location.href = '/student/login'
             }
           }}
-          className="w-full mt-2 bg-red-50 text-red-600 py-3 rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-red-100 transition text-sm border border-red-200"
+          className="w-full mt-3 bg-gray-100 text-gray-600 py-3 rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-gray-200 transition text-sm"
         >
-          🗑️ Reset Aplikasi (Hapus Semua Cache)
+          🔄 Reset Aplikasi
         </button>
-        <p className="text-[10px] text-gray-400 text-center mt-1">Gunakan jika aplikasi error atau perlu update. Anda harus login & sync ulang.</p>
+        <p className="text-[10px] text-gray-400 text-center mt-1">Hapus semua cache & data lokal. Gunakan jika ada error atau perlu sync ulang.</p>
       </div>
     </StudentLayout>
   )
