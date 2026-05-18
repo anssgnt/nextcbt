@@ -590,7 +590,7 @@ export const AdminSchedule = () => {
                               </button>
                               {/* Preview Soal */}
                               <button
-                                onClick={() => handlePreviewSoal(meta.bank_soal)}
+                                onClick={() => handlePreviewSoal(meta.bank_soal || meta.subject)}
                                 className="p-1.5 text-purple-600 hover:bg-purple-50 rounded" title="Preview Soal"
                               >
                                 <Eye size={14} />
@@ -624,6 +624,56 @@ export const AdminSchedule = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Preview Soal Modal (List View) */}
+        {previewSoal && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl max-w-3xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+              <div className="flex items-center justify-between p-4 border-b">
+                <div>
+                  <h3 className="font-bold text-lg">Preview Soal: {previewSoal.subject}</h3>
+                  <p className="text-sm text-gray-500">{previewSoal.questions.length} soal</p>
+                </div>
+                <button onClick={() => setPreviewSoal(null)} className="p-2 hover:bg-gray-100 rounded-lg">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="overflow-y-auto p-4 space-y-3">
+                {previewSoal.questions.map((q, idx) => (
+                  <div key={q.id} className="p-3 border rounded-lg text-sm">
+                    <p className="font-medium mb-2">{idx + 1}. {q.question_text}</p>
+                    {q.options && Array.isArray(q.options) && (
+                      <div className="ml-4 space-y-1">
+                        {q.options.map((opt) => (
+                          <p key={opt.id} className={`text-xs ${q.correct_answer && q.correct_answer.includes(opt.id) ? 'text-green-700 font-semibold' : 'text-gray-600'}`}>
+                            {opt.id}. {opt.text} {q.correct_answer && q.correct_answer.includes(opt.id) ? '✓' : ''}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                    {q.matching_pairs && Array.isArray(q.matching_pairs) && (
+                      <div className="ml-4 grid grid-cols-2 gap-1 mt-1">
+                        {q.matching_pairs.map((p, i) => (
+                          <div key={i} className="contents">
+                            <span className="text-xs bg-blue-50 px-2 py-0.5 rounded">{p.left}</span>
+                            <span className="text-xs bg-green-50 px-2 py-0.5 rounded">→ {p.right}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {(q.type === 'uraian_singkat' || q.type === 'short_answer') && q.correct_answer && (
+                      <p className="ml-4 mt-1 text-xs text-green-700"><b>Kunci:</b> {q.correct_answer}</p>
+                    )}
+                    {q.score && <p className="ml-4 mt-1 text-xs text-blue-600">Skor: {q.score}</p>}
+                  </div>
+                ))}
+                {previewSoal.questions.length === 0 && (
+                  <p className="text-center text-gray-500 py-8">Tidak ada soal di bank soal ini</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </AdminLayout>
   )
