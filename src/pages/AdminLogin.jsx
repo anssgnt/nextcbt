@@ -25,7 +25,6 @@ export const AdminLogin = () => {
       )
 
       if (!dbError && data) {
-        // Verify password
         if (data.password === password) {
           setUser({ id: data.id, email: data.email, name: data.name || 'Admin' }, 'admin')
           navigate('/admin/dashboard')
@@ -37,17 +36,9 @@ export const AdminLogin = () => {
           return
         }
       }
-    } catch {
-      // DB check failed, fall through to mock credentials
-    }
+    } catch {}
 
-    // Fallback: mock credentials (jika tabel belum ada atau DB error)
-    if (email === 'admin@cbt.com' && password === 'admin123') {
-      setUser({ id: 'admin-1', email, name: 'Admin' }, 'admin')
-      navigate('/admin/dashboard')
-    } else {
-      setError('Email atau password salah')
-    }
+    setError('Email atau password salah')
 
     setIsLoading(false)
   }
