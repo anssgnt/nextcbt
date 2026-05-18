@@ -33,7 +33,7 @@ export const AdminResults = () => {
     try {
       const { data, error } = await supabase
         .from('exam_sessions')
-        .select('id, score, status, submitted_at, student_id, exam_id, students(name), exams(title)')
+        .select('id, score, status, submitted_at, student_id, exam_id, students(name, class_name), exams(title)')
         .eq('status', 'submitted')
         .order('submitted_at', { ascending: false })
 
@@ -44,6 +44,7 @@ export const AdminResults = () => {
         studentId: r.student_id,
         examId: r.exam_id,
         studentName: r.students?.name || '-',
+        className: r.students?.class_name || '-',
         exam: r.exams?.title || '-',
         score: r.score || 0,
         status: (r.score || 0) >= 70 ? 'Lulus' : 'Tidak Lulus',
@@ -159,8 +160,8 @@ export const AdminResults = () => {
 
   const handleExportResults = () => {
     const csv = [
-      ['Nama Siswa', 'Ujian', 'Nilai', 'Status', 'Tanggal'],
-      ...filteredResults.map((r) => [r.studentName, r.exam, r.score, r.status, r.date]),
+      ['Nama Siswa', 'Kelas', 'Ujian', 'Nilai', 'Tanggal'],
+      ...filteredResults.map((r) => [r.studentName, r.className, r.exam, r.score, r.date]),
     ].map((row) => row.join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = window.URL.createObjectURL(blob)
@@ -183,9 +184,9 @@ export const AdminResults = () => {
     w.document.write(`<p><b>Jumlah Peserta:</b> ${filteredResults.length}</p>`)
     w.document.write(`<p><b>Rata-rata:</b> ${avgScore}</p>`)
     w.document.write(`<p><b>Kelulusan:</b> ${passRate}% (${passCount} dari ${totalStudents})</p>`)
-    w.document.write(`<table><thead><tr><th style="width:30px">No</th><th>Nama Siswa</th><th>Ujian</th><th style="width:60px">Nilai</th><th style="width:80px">Status</th><th>Tanggal</th></tr></thead><tbody>`)
+    w.document.write(`<table><thead><tr><th style="width:30px">No</th><th>Nama Siswa</th><th>Kelas</th><th>Ujian</th><th style="width:60px">Nilai</th><th>Tanggal</th></tr></thead><tbody>`)
     filteredResults.forEach((r, idx) => {
-      w.document.write(`<tr><td>${idx + 1}</td><td>${r.studentName}</td><td>${r.exam}</td><td class="${r.score >= 70 ? 'pass' : 'fail'}">${r.score}</td><td>${r.status}</td><td>${r.date}</td></tr>`)
+      w.document.write(`<tr><td>${idx + 1}</td><td>${r.studentName}</td><td>${r.className}</td><td>${r.exam}</td><td class="${r.score >= 70 ? 'pass' : 'fail'}">${r.score}</td><td>${r.date}</td></tr>`)
     })
     w.document.write(`</tbody></table>`)
     w.document.write(`<p style="margin-top:30px;font-size:10px;color:#666">Dicetak: ${new Date().toLocaleString('id-ID')}</p>`)
@@ -302,9 +303,9 @@ export const AdminResults = () => {
                   <thead className="bg-gray-50 border-b">
                     <tr>
                       <th className="px-4 py-3 text-left font-semibold">Nama</th>
+                      <th className="px-4 py-3 text-left font-semibold">Kelas</th>
                       <th className="px-4 py-3 text-left font-semibold">Ujian</th>
                       <th className="px-4 py-3 text-left font-semibold">Nilai</th>
-                      <th className="px-4 py-3 text-left font-semibold">Status</th>
                       <th className="px-4 py-3 text-left font-semibold">Tanggal</th>
                       <th className="px-4 py-3 text-left font-semibold">Aksi</th>
                     </tr>
@@ -313,9 +314,9 @@ export const AdminResults = () => {
                     {filteredResults.map((r) => (
                       <tr key={r.id} className="border-b hover:bg-gray-50">
                         <td className="px-4 py-3 font-medium">{r.studentName}</td>
+                        <td className="px-4 py-3"><span className="px-2 py-1 bg-purple-50 text-purple-700 rounded text-xs font-medium">{r.className}</span></td>
                         <td className="px-4 py-3">{r.exam}</td>
                         <td className="px-4 py-3"><span className={`font-bold ${r.score >= 70 ? 'text-green-600' : 'text-red-600'}`}>{r.score}</span></td>
-                        <td className="px-4 py-3"><span className={`px-2 py-1 rounded-full text-xs font-semibold ${r.status === 'Lulus' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{r.status}</span></td>
                         <td className="px-4 py-3 text-gray-600">{r.date}</td>
                         <td className="px-4 py-3">
                           <button
