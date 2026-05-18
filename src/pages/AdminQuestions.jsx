@@ -215,6 +215,7 @@ export const AdminQuestions = () => {
       score: q.score || 1,
       matching_pairs: q.matching_pairs ? [...q.matching_pairs] : [],
       subject: q.subject || '',
+      image_url: q.image_url || '',
     })
   }
 
@@ -229,6 +230,7 @@ export const AdminQuestions = () => {
         score: editingQuestion.score,
         options: editingQuestion.options.length > 0 ? editingQuestion.options : null,
         matching_pairs: editingQuestion.matching_pairs.length > 0 ? editingQuestion.matching_pairs : null,
+        image_url: editingQuestion.image_url || null,
       }
       const { error } = await adminService.updateQuestion(editingQuestion.id, updateData)
       if (error) throw error
@@ -550,13 +552,24 @@ export const AdminQuestions = () => {
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                       dir="auto"
                     />
-                    <div className="mt-1 p-2 bg-gray-50 rounded text-[10px] text-gray-500 space-y-0.5">
-                      <p><b>Format khusus:</b></p>
-                      <p>• Gambar: <code className="bg-white px-1 rounded">[img:https://link-gambar.png]</code></p>
-                      <p>• Arab/Quran: <code className="bg-white px-1 rounded">[ar:بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ]</code></p>
-                      <p>• Matematika: <code className="bg-white px-1 rounded">[math:sqrt(x^2+y^2)]</code></p>
-                      <p>• Atau langsung paste teks Arab/simbol Unicode: √ ² ³ π ≤ ≥ ± ∞</p>
-                    </div>
+                    <p className="text-[10px] text-gray-400 mt-1">Teks Arab & simbol matematika bisa langsung di-paste (√ ² ³ π ≤ ≥ ± ∞)</p>
+                  </div>
+
+                  {/* Gambar Soal */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Gambar Soal (opsional)</label>
+                    <input
+                      type="text"
+                      value={editingQuestion.image_url || ''}
+                      onChange={(e) => setEditingQuestion({ ...editingQuestion, image_url: e.target.value })}
+                      placeholder="Paste link gambar di sini (https://...)"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    />
+                    {editingQuestion.image_url && (
+                      <div className="mt-2 p-2 bg-gray-50 rounded-lg border">
+                        <img src={editingQuestion.image_url} alt="Preview" className="max-h-32 rounded" onError={(e) => { e.target.style.display = 'none' }} />
+                      </div>
+                    )}
                   </div>
 
                   {/* Opsi (PG / PG Kompleks) */}
