@@ -38,15 +38,31 @@ export function ReviewAnswersPage() {
       setExamTitle(session.exams?.title || 'Ujian')
       setScore(session.score || 0)
 
-      // 2. Get questions for this exam
-      const { data: qData, error: qErr } = await supabase
-        .from('questions')
-        .select('id, question_text, type, options, correct_answer, "order"')
+      // 2. Get questions from published_exams (terkunci, sumber kebenaran)
+      let questionsData = []
+      const { data: published } = await supabase
+        .from('published_exams')
+        .select('data')
         .eq('exam_id', session.exam_id)
-        .order('"order"', { ascending: true })
+        .maybeSingle()
 
-      if (qErr) throw qErr
-      setQuestions(qData || [])
+      if (published?.data?.questions) {
+        questionsData = published.data.questions
+      } else {
+        // Fallback: coba dari tabel questions (legacy)
+        const { data: qData } = await supabase
+          .from('questions')
+          .select('id, question_text, type, options, correct_answer, matching_pairs, score, "order"')
+          .eq('exam_id', session.exam_id)
+          .order('"order"', { ascending: true })
+        questionsData = qData || []
+      }
+
+      if (questionsData.length === 0) {
+        setError('Soal ujian tidak ditemukan. Ujian mungkin belum dipublish.')
+        return
+      }
+      setQuestions(questionsData)
 
       // 3. Get student's answers for this session
       const { data: aData, error: aErr } = await supabase

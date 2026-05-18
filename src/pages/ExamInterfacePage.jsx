@@ -16,6 +16,7 @@ export const ExamInterfacePage = () => {
     currentQuestionIndex, setCurrentQuestionIndex,
     markedQuestions, toggleMarkQuestion,
     setSessionId, sessionId,
+    resetExam,
   } = useExamStore()
 
   const [questions, setQuestions] = useState([])
@@ -237,6 +238,7 @@ export const ExamInterfacePage = () => {
       localStorage.setItem('completed_exams', JSON.stringify(completed))
       // Exit fullscreen
       try { document.exitFullscreen?.() } catch {}
+      resetExam()
       navigate(`/result/${examId}`)
     } catch { setToast({ type: 'error', message: 'Gagal submit' }); setIsSubmitting(false) }
   }
