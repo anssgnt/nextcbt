@@ -1,22 +1,36 @@
 ﻿import { useEffect, useState } from 'react'
 import { useExamStore } from '../store'
 
-export const useExamTimer = (duration) => {
+export const useExamTimer = (duration, examId) => {
   const { timeRemaining, setTimeRemaining } = useExamStore()
   const [isTimeUp, setIsTimeUp] = useState(false)
 
   useEffect(() => {
-    if (timeRemaining === 0 && duration > 0) {
-      setTimeRemaining(duration * 60)
+    if (!duration || duration <= 0) return
+
+    // Persist start time — timer survives refresh/crash
+    const startKey = `exam_start_${examId}`
+    let startTime = localStorage.getItem(startKey)
+
+    if (!startTime) {
+      startTime = Date.now().toString()
+      localStorage.setItem(startKey, startTime)
     }
-  }, [duration, timeRemaining, setTimeRemaining])
+
+    const elapsed = Math.floor((Date.now() - parseInt(startTime)) / 1000)
+    const totalSeconds = duration * 60
+    const remaining = Math.max(0, totalSeconds - elapsed)
+
+    setTimeRemaining(remaining)
+    if (remaining <= 0) setIsTimeUp(true)
+  }, [duration, examId])
 
   useEffect(() => {
     if (timeRemaining <= 0) return
 
     const interval = setInterval(() => {
       setTimeRemaining(timeRemaining - 1)
-      if (timeRemaining - 1 === 0) {
+      if (timeRemaining - 1 <= 0) {
         setIsTimeUp(true)
       }
     }, 1000)

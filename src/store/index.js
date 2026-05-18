@@ -21,7 +21,7 @@ export const useExamStore = create(
     (set, get) => ({
       currentExam: null,
       answers: {},
-      markedQuestions: new Set(),
+      markedQuestions: [],
       currentQuestionIndex: 0,
       timeRemaining: 0,
       isSubmitted: false,
@@ -34,11 +34,12 @@ export const useExamStore = create(
         })),
       toggleMarkQuestion: (questionId) =>
         set((state) => {
-          const marked = new Set(state.markedQuestions)
-          if (marked.has(questionId)) {
-            marked.delete(questionId)
+          const marked = [...(state.markedQuestions || [])]
+          const idx = marked.indexOf(questionId)
+          if (idx >= 0) {
+            marked.splice(idx, 1)
           } else {
-            marked.add(questionId)
+            marked.push(questionId)
           }
           return { markedQuestions: marked }
         }),
@@ -50,7 +51,7 @@ export const useExamStore = create(
         set({
           currentExam: null,
           answers: {},
-          markedQuestions: new Set(),
+          markedQuestions: [],
           currentQuestionIndex: 0,
           timeRemaining: 0,
           isSubmitted: false,

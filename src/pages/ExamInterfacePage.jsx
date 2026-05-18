@@ -29,7 +29,7 @@ export const ExamInterfacePage = () => {
   const [warningCountdown, setWarningCountdown] = useState(0)
   const isOnline = useOnlineStatus()
 
-  const { timeRemaining, isTimeUp } = useExamTimer(currentExam?.duration)
+  const { timeRemaining, isTimeUp } = useExamTimer(currentExam?.duration, examId)
 
   useTabVisibility(() => {
     setViolations((v) => {
@@ -92,13 +92,25 @@ export const ExamInterfacePage = () => {
       setCurrentExam(examData.exam)
       setExamMeta(examData.meta || {})
       let q = examData.questions || []
-      if (examData.meta?.shuffle) q = [...q].sort(() => Math.random() - 0.5)
-      // Feature 5: Question limit - randomly pick N questions
-      const questionsLimit = examData.meta?.questions_limit
-      if (questionsLimit && questionsLimit > 0 && q.length > questionsLimit) {
-        q = [...q].sort(() => Math.random() - 0.5).slice(0, questionsLimit)
+
+      // Soal dari published_exams sudah terkunci (urutan & seleksi sudah final)
+      // Hanya shuffle/limit jika BELUM dipublish (legacy/fallback)
+      if (!examData.version) {
+        if (examData.meta?.shuffle) q = [...q].sort(() => Math.random() - 0.5)
+        const questionsLimit = examData.meta?.questions_limit
+        if (questionsLimit && questionsLimit > 0 && q.length > questionsLimit) {
+          q = [...q].sort(() => Math.random() - 0.5).slice(0, questionsLimit)
+        }
       }
+
       setQuestions(q)
+
+      // Restore answers dari localStorage (survive crash/refresh)
+      const savedAnswers = JSON.parse(localStorage.getItem(`answers_${examId}`) || '{}')
+      Object.entries(savedAnswers).forEach(([qId, ans]) => {
+        setAnswer(qId, ans)
+      })
+
       if (!sessionId) setSessionId(`session_${examId}_${Date.now()}`)
     } catch { setToast({ type: 'error', message: 'Gagal memuat soal' }) }
     finally { setIsLoading(false) }
@@ -215,6 +227,7 @@ export const ExamInterfacePage = () => {
       localStorage.setItem(`exam_result_${examId}`, JSON.stringify(resultData))
 
       localStorage.removeItem(`answers_${examId}`)
+      localStorage.removeItem(`exam_start_${examId}`)
       // Mark as completed
       const completed = JSON.parse(localStorage.getItem('completed_exams') || '{}')
       completed[examId] = Date.now()
@@ -263,7 +276,7 @@ export const ExamInterfacePage = () => {
 
   const currentQuestion = questions[currentQuestionIndex]
   const currentAnswer = answers[currentQuestion?.id]
-  const isMarked = markedQuestions.has(currentQuestion?.id)
+  const isMarked = (markedQuestions || []).includes(currentQuestion?.id)
   const answeredCount = Object.keys(answers).length
 
   const renderQuestion = () => {
@@ -397,7 +410,7 @@ export const ExamInterfacePage = () => {
                 className={`aspect-square rounded-lg text-[11px] font-medium transition ${
                   idx === currentQuestionIndex ? 'bg-blue-600 text-white' :
                   answers[q.id] ? 'bg-green-100 text-green-700' :
-                  markedQuestions.has(q.id) ? 'bg-yellow-100 text-yellow-700' :
+                  markedQuestions.includes(q.id) ? 'bg-yellow-100 text-yellow-700' :
                   'bg-gray-100 text-gray-600'
                 }`}
               >{idx + 1}</button>
@@ -405,7 +418,7 @@ export const ExamInterfacePage = () => {
           </div>
           <div className="flex gap-4 mt-2 text-[10px] text-gray-500">
             <span>🟢 {answeredCount} dijawab</span>
-            <span>🟡 {markedQuestions.size} ditandai</span>
+            <span>🟡 {(markedQuestions || []).length} ditandai</span>
             <span>⚪ {questions.length - answeredCount} belum</span>
           </div>
         </div>

@@ -23,7 +23,47 @@ export const ExamPage = () => {
   const [completedExams, setCompletedExams] = useState({})
   const isOnline = navigator.onLine
 
-  useEffect(() => { loadExams(); loadCompletedStatus() }, [])
+  useEffect(() => { loadExams(); loadCompletedStatus(); retryPendingSubmissions() }, [])
+
+  // Retry pending submissions yang gagal (offline/error)
+  const retryPendingSubmissions = async () => {
+    if (!navigator.onLine || !user?.id) return
+    const keys = Object.keys(localStorage).filter((k) => k.startsWith('pending_submit_'))
+    for (const key of keys) {
+      const examId = key.replace('pending_submit_', '')
+      try {
+        const allAnswers = JSON.parse(localStorage.getItem(key))
+        if (!allAnswers) continue
+
+        // Cek apakah sudah ada session (jangan duplikat)
+        const { data: existing } = await queuedFetch(
+          supabase.from('exam_sessions').select('id').eq('student_id', user.id).eq('exam_id', examId).eq('status', 'submitted').maybeSingle()
+        )
+        if (existing) {
+          localStorage.removeItem(key)
+          continue
+        }
+
+        // Submit
+        const { data: sessionData } = await queuedFetch(
+          supabase.from('exam_sessions').insert({
+            student_id: user.id, exam_id: examId, status: 'submitted',
+            score: 0, submitted_at: new Date().toISOString(),
+          }).select('id').single()
+        )
+
+        if (sessionData?.id) {
+          localStorage.removeItem(key)
+          // Mark completed
+          const completed = JSON.parse(localStorage.getItem('completed_exams') || '{}')
+          completed[examId] = Date.now()
+          localStorage.setItem('completed_exams', JSON.stringify(completed))
+        }
+      } catch {
+        // Still offline or error, will retry next time
+      }
+    }
+  }
 
   // Cek status ujian dari server (siswa tidak bisa bypass)
   const loadCompletedStatus = async () => {
