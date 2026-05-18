@@ -73,10 +73,10 @@ export const AdminResults = () => {
         .eq('status', 'submitted')
       if (sessErr) throw sessErr
 
-      // 2. Ambil semua soal (dengan correct_answer)
+      // 2. Ambil semua soal (dengan correct_answer, score, matching_pairs)
       const { data: allQuestions, error: qErr } = await supabase
         .from('questions')
-        .select('id, exam_id, type, correct_answer')
+        .select('id, exam_id, type, correct_answer, score, matching_pairs')
       if (qErr) throw qErr
 
       // 3. Ambil semua jawaban
@@ -96,30 +96,35 @@ export const AdminResults = () => {
 
         const sessionAnswers = allAnswers.filter((a) => a.session_id === session.id)
 
-        let correct = 0
+        let earnedScore = 0
+        let totalScore = 0
         examQuestions.forEach((q) => {
+          const weight = q.score || 1
+          totalScore += weight
           const ans = sessionAnswers.find((a) => a.question_id === q.id)
           if (!ans) return
 
+          let isCorrect = false
           const type = q.type
           if (type === 'uraian_singkat' || type === 'short_answer' || type === 'essay') {
-            if (q.correct_answer && isEssayCorrect(ans.answer_text, q.correct_answer)) correct++
+            if (q.correct_answer) isCorrect = isEssayCorrect(ans.answer_text, q.correct_answer)
           } else if (type === 'menjodohkan' || type === 'matching') {
             try {
               const parsed = JSON.parse(ans.answer_text)
-              if (isMatchingCorrect(parsed, q.matching_pairs)) correct++
+              isCorrect = isMatchingCorrect(parsed, q.matching_pairs)
             } catch {}
           } else if (type === 'pilihan_ganda_kompleks' || type === 'multiple_choice_complex') {
             const userAns = Array.isArray(ans.answer_text)
               ? ans.answer_text.sort().join(',')
               : (ans.answer_text || '')
-            if (q.correct_answer && userAns === q.correct_answer) correct++
+            if (q.correct_answer) isCorrect = userAns === q.correct_answer
           } else {
-            if (q.correct_answer && ans.answer_text === q.correct_answer) correct++
+            if (q.correct_answer) isCorrect = ans.answer_text === q.correct_answer
           }
+          if (isCorrect) earnedScore += weight
         })
 
-        const newScore = Math.round((correct / examQuestions.length) * 100)
+        const newScore = totalScore > 0 ? Math.round((earnedScore / totalScore) * 100) : 0
         updatedCount++
 
         if (newScore !== session.score) {

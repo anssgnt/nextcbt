@@ -143,27 +143,34 @@ export const isMatchingCorrect = (userAnswer, matchingPairs) => {
 }
 
 export const calculateScore = (answers, questions) => {
-  let correct = 0
+  let earnedScore = 0
+  let totalScore = 0
+
   questions.forEach((q) => {
+    const weight = q.score || 1 // bobot skor per soal (default 1)
+    totalScore += weight
+
     const userAnswer = answers[q.id]
     if (!userAnswer) return
 
     const type = q.type
+    let isCorrect = false
+
     if (type === 'uraian_singkat' || type === 'short_answer' || type === 'essay') {
-      if (!q.correct_answer) return
-      if (isEssayCorrect(userAnswer, q.correct_answer)) correct++
+      if (q.correct_answer) isCorrect = isEssayCorrect(userAnswer, q.correct_answer)
     } else if (type === 'pilihan_ganda_kompleks' || type === 'multiple_choice_complex') {
-      if (!q.correct_answer) return
-      if (Array.isArray(userAnswer) && userAnswer.sort().join(',') === q.correct_answer) correct++
+      if (q.correct_answer && Array.isArray(userAnswer)) isCorrect = userAnswer.sort().join(',') === q.correct_answer
     } else if (type === 'menjodohkan' || type === 'matching') {
-      if (isMatchingCorrect(userAnswer, q.matching_pairs)) correct++
+      isCorrect = isMatchingCorrect(userAnswer, q.matching_pairs)
     } else {
-      // Pilihan ganda, benar/salah, dll: exact match
-      if (!q.correct_answer) return
-      if (userAnswer === q.correct_answer) correct++
+      if (q.correct_answer) isCorrect = userAnswer === q.correct_answer
     }
+
+    if (isCorrect) earnedScore += weight
   })
-  return Math.round((correct / questions.length) * 100)
+
+  // Nilai = skor didapat / total skor × 100 (selalu skala 100)
+  return totalScore > 0 ? Math.round((earnedScore / totalScore) * 100) : 0
 }
 
 export const getLocalStorage = (key, defaultValue) => {

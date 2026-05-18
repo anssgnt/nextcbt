@@ -226,20 +226,27 @@ export const ExamInterfacePage = () => {
   }
 
   const calculateScore = (answersMap) => {
-    let correct = 0
+    let earnedScore = 0
+    let totalScore = 0
     questions.forEach((q) => {
+      const weight = q.score || 1
+      totalScore += weight
       const a = answersMap[q.id]
       if (!a) return
       const type = q.type
+      let isCorrect = false
       if (type === 'uraian_singkat' || type === 'short_answer' || type === 'essay') {
-        if (q.correct_answer && isEssayCorrect(a, q.correct_answer)) correct++
+        if (q.correct_answer) isCorrect = isEssayCorrect(a, q.correct_answer)
       } else if (type === 'menjodohkan' || type === 'matching') {
-        if (isMatchingCorrect(a, q.matching_pairs)) correct++
+        isCorrect = isMatchingCorrect(a, q.matching_pairs)
       } else if (Array.isArray(a)) {
-        if (q.correct_answer && a.sort().join(',') === q.correct_answer) correct++
-      } else if (q.correct_answer && a === q.correct_answer) correct++
+        if (q.correct_answer) isCorrect = a.sort().join(',') === q.correct_answer
+      } else if (q.correct_answer) {
+        isCorrect = a === q.correct_answer
+      }
+      if (isCorrect) earnedScore += weight
     })
-    return questions.length > 0 ? Math.round((correct / questions.length) * 100) : 0
+    return totalScore > 0 ? Math.round((earnedScore / totalScore) * 100) : 0
   }
 
   if (isLoading) {
