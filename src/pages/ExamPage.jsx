@@ -90,6 +90,7 @@ export const ExamPage = () => {
         if (!map[examId]) {
           localStorage.removeItem(`exam_result_${examId}`)
           localStorage.removeItem(`answers_${examId}`)
+          localStorage.removeItem(`exam_start_${examId}`)
         }
       })
     } catch {
