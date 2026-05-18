@@ -56,6 +56,36 @@ export function ProfilePage() {
           🔄 Reset Sync
         </button>
         <p className="text-[10px] text-gray-400 text-center mt-1">Hanya menghapus soal offline. Status ujian dikontrol admin.</p>
+
+        {/* Reset Aplikasi Total */}
+        <button
+          onClick={async () => {
+            if (!confirm('Reset aplikasi akan menghapus SEMUA data lokal (cache, sync, hasil). Anda perlu login ulang. Lanjutkan?')) return
+            try {
+              // 1. Unregister service workers
+              if ('serviceWorker' in navigator) {
+                const registrations = await navigator.serviceWorker.getRegistrations()
+                await Promise.all(registrations.map((r) => r.unregister()))
+              }
+              // 2. Clear all caches
+              if ('caches' in window) {
+                const keys = await caches.keys()
+                await Promise.all(keys.map((k) => caches.delete(k)))
+              }
+              // 3. Clear localStorage (kecuali auth)
+              localStorage.clear()
+              // 4. Reload
+              window.location.href = '/student/login'
+            } catch {
+              localStorage.clear()
+              window.location.href = '/student/login'
+            }
+          }}
+          className="w-full mt-2 bg-red-50 text-red-600 py-3 rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-red-100 transition text-sm border border-red-200"
+        >
+          🗑️ Reset Aplikasi (Hapus Semua Cache)
+        </button>
+        <p className="text-[10px] text-gray-400 text-center mt-1">Gunakan jika aplikasi error atau perlu update. Anda harus login & sync ulang.</p>
       </div>
     </StudentLayout>
   )
