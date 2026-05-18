@@ -206,7 +206,18 @@ export const AdminSchedule = () => {
         selectedQuestions = [...selectedQuestions].sort(() => Math.random() - 0.5)
       }
 
+      // Auto-weight: distribusi bobot skor agar total = 100
+      if (selectedQuestions.length > 0) {
+        const baseScore = Math.floor(100 / selectedQuestions.length)
+        const remainder = 100 - (baseScore * selectedQuestions.length)
+        selectedQuestions = selectedQuestions.map((q, idx) => ({
+          ...q,
+          score: baseScore + (idx < remainder ? 1 : 0), // distribusi sisa ke soal awal
+        }))
+      }
+
       const version = Date.now()
+      const totalSkor = selectedQuestions.reduce((s, q) => s + (q.score || 0), 0)
       const publishData = {
         exam: {
           id: exam.id,
@@ -235,8 +246,7 @@ export const AdminSchedule = () => {
       // Update questions_count di exams table
       await supabase.from('exams').update({ questions_count: selectedQuestions.length }).eq('id', exam.id)
 
-      const totalSkor = selectedQuestions.reduce((s, q) => s + (q.score || 1), 0)
-      alert(`✅ Ujian "${exam.title}" berhasil dipublish!\nVersi: ${new Date(version).toLocaleString('id-ID')}\nJumlah soal: ${selectedQuestions.length}\nTotal skor: ${totalSkor}`)
+      alert(`✅ Ujian "${exam.title}" berhasil dipublish!\nVersi: ${new Date(version).toLocaleString('id-ID')}\nJumlah soal: ${selectedQuestions.length}\nTotal skor: ${totalSkor} (bobot otomatis)`)
     } catch (err) {
       alert('❌ Gagal publish: ' + err.message)
     } finally {
