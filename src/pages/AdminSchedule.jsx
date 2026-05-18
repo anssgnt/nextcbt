@@ -79,11 +79,17 @@ export const AdminSchedule = () => {
     }
   }
 
-  const handlePreviewSoal = async (bankSoal) => {
+  const handlePreviewSoal = async (bankSoal, questionsLimit) => {
     if (!bankSoal) { alert('Bank soal tidak tersedia'); return }
     try {
       const { data } = await supabase.from('questions').select('*').eq('subject', bankSoal).order('created_at')
-      setPreviewSoal({ subject: bankSoal, questions: data || [] })
+      let questions = data || []
+      // Jika ada limit, acak dan ambil sejumlah limit (simulasi seperti siswa)
+      if (questionsLimit && questionsLimit > 0 && questions.length > questionsLimit) {
+        questions = [...questions].sort(() => Math.random() - 0.5).slice(0, questionsLimit)
+      }
+      const totalSkor = questions.reduce((s, q) => s + (q.score || 1), 0)
+      setPreviewSoal({ subject: bankSoal, questions, totalBank: (data || []).length, limit: questionsLimit || 0, totalSkor })
     } catch (err) {
       alert('Gagal load soal: ' + err.message)
     }
@@ -406,7 +412,12 @@ export const AdminSchedule = () => {
               <div className="flex items-center justify-between p-4 border-b">
                 <div>
                   <h3 className="font-bold text-lg">Preview Soal: {previewSoal.subject}</h3>
-                  <p className="text-sm text-gray-500">{previewSoal.questions.length} soal</p>
+                  <p className="text-sm text-gray-500">
+                    {previewSoal.limit > 0
+                      ? `${previewSoal.questions.length} soal ditampilkan (dari ${previewSoal.totalBank} di bank) • Total skor: ${previewSoal.totalSkor}`
+                      : `${previewSoal.questions.length} soal • Total skor: ${previewSoal.totalSkor}`
+                    }
+                  </p>
                 </div>
                 <button onClick={() => setPreviewSoal(null)} className="p-2 hover:bg-gray-100 rounded-lg">
                   <X size={20} />
@@ -590,7 +601,7 @@ export const AdminSchedule = () => {
                               </button>
                               {/* Preview Soal */}
                               <button
-                                onClick={() => handlePreviewSoal(meta.bank_soal || meta.subject)}
+                                onClick={() => handlePreviewSoal(meta.bank_soal || meta.subject, meta.questions_limit)}
                                 className="p-1.5 text-purple-600 hover:bg-purple-50 rounded" title="Preview Soal"
                               >
                                 <Eye size={14} />
@@ -632,7 +643,12 @@ export const AdminSchedule = () => {
               <div className="flex items-center justify-between p-4 border-b">
                 <div>
                   <h3 className="font-bold text-lg">Preview Soal: {previewSoal.subject}</h3>
-                  <p className="text-sm text-gray-500">{previewSoal.questions.length} soal</p>
+                  <p className="text-sm text-gray-500">
+                    {previewSoal.limit > 0
+                      ? `${previewSoal.questions.length} soal ditampilkan (dari ${previewSoal.totalBank} di bank) • Total skor: ${previewSoal.totalSkor}`
+                      : `${previewSoal.questions.length} soal • Total skor: ${previewSoal.totalSkor}`
+                    }
+                  </p>
                 </div>
                 <button onClick={() => setPreviewSoal(null)} className="p-2 hover:bg-gray-100 rounded-lg">
                   <X size={20} />
