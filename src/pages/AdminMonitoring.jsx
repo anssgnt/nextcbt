@@ -250,6 +250,17 @@ export const AdminMonitoring = () => {
               </div>
             </CardContent>
           </Card>
+          <Card>
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-center gap-3">
+                <Activity size={20} className="text-orange-600 animate-pulse" />
+                <div>
+                  <p className="text-xs text-gray-500">Sedang Ujian</p>
+                  <p className="text-2xl font-bold text-orange-600">{Math.max(0, stats.sessions - stats.submitted)}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Charts */}

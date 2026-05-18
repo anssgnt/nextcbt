@@ -231,6 +231,10 @@ export const ExamPage = () => {
 
   // Sync tanpa mulai (pre-sync)
   const handlePreSync = async (exam) => {
+    // Konfirmasi jika sudah pernah sync
+    if (syncedExams[exam.id]) {
+      if (!confirm('Soal sudah di-sync sebelumnya. Sync ulang untuk mendapatkan versi terbaru?')) return
+    }
     setSyncing(exam.id)
     setSyncError(null)
     try {

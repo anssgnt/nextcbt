@@ -187,7 +187,7 @@ export const AdminQuestions = () => {
   }
 
   const handleDeleteSubject = async (subjectName) => {
-    if (!confirm(`Hapus semua soal "${subjectName}"?`)) return
+    if (!confirm(`Hapus semua soal "${subjectName}"?\n\n⚠️ PERHATIAN: Ujian yang sudah dipublish dengan bank soal ini TIDAK terpengaruh (soal sudah terkunci di published_exams).`)) return
     const ids = (grouped[subjectName] || []).map((q) => q.id)
     for (const id of ids) {
       await adminService.deleteQuestion(id)

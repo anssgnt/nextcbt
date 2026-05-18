@@ -27,6 +27,7 @@ export const ExamInterfacePage = () => {
   const [violations, setViolations] = useState(0)
   const [examMeta, setExamMeta] = useState({})
   const [warningCountdown, setWarningCountdown] = useState(0)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const isOnline = useOnlineStatus()
 
   const { timeRemaining, isTimeUp } = useExamTimer(currentExam?.duration, examId)
@@ -129,6 +130,8 @@ export const ExamInterfacePage = () => {
   }
 
   const handleSubmitExam = async () => {
+    if (isSubmitting) return // Prevent double submit
+    setIsSubmitting(true)
     try {
       const savedAnswers = JSON.parse(localStorage.getItem(`answers_${examId}`) || '{}')
       const allAnswers = { ...savedAnswers, ...answers }
@@ -235,7 +238,7 @@ export const ExamInterfacePage = () => {
       // Exit fullscreen
       try { document.exitFullscreen?.() } catch {}
       navigate(`/result/${examId}`)
-    } catch { setToast({ type: 'error', message: 'Gagal submit' }) }
+    } catch { setToast({ type: 'error', message: 'Gagal submit' }); setIsSubmitting(false) }
   }
 
   const calculateScore = (answersMap) => {

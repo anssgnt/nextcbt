@@ -62,10 +62,15 @@ export function ReviewAnswersPage() {
         return
       }
 
-      // Map answers by question_id
+      // Map answers by question_id (parse JSON for object answers like menjodohkan)
       const ansMap = {}
       ;(aData || []).forEach((a) => {
-        ansMap[a.question_id] = a.answer_text
+        let val = a.answer_text
+        // Try to parse JSON (menjodohkan, complex answers stored as JSON string)
+        if (val && (val.startsWith('{') || val.startsWith('['))) {
+          try { val = JSON.parse(val) } catch {}
+        }
+        ansMap[a.question_id] = val
       })
       setAnswers(ansMap)
     } catch (err) {
