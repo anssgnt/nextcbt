@@ -37,6 +37,11 @@ export const AdminSchedule = () => {
     kelas: '',
     questions_limit: 0,
     save_answers: false,
+    komposisi_pg: 0,
+    komposisi_pg_kompleks: 0,
+    komposisi_benar_salah: 0,
+    komposisi_menjodohkan: 0,
+    komposisi_uraian: 0,
   })
 
   useEffect(() => {
@@ -79,17 +84,33 @@ export const AdminSchedule = () => {
     }
   }
 
-  const handlePreviewSoal = async (bankSoal, questionsLimit) => {
+  const handlePreviewSoal = async (bankSoal, questionsLimit, examId) => {
     if (!bankSoal) { alert('Bank soal tidak tersedia'); return }
     try {
+      // Coba ambil dari published_exams dulu (soal yang sudah terkunci)
+      if (examId) {
+        const { data: published } = await supabase
+          .from('published_exams')
+          .select('data')
+          .eq('exam_id', examId)
+          .maybeSingle()
+
+        if (published?.data?.questions) {
+          const questions = published.data.questions
+          const totalSkor = questions.reduce((s, q) => s + (q.score || 1), 0)
+          setPreviewSoal({ subject: bankSoal, questions, totalBank: questions.length, limit: 0, totalSkor, isPublished: true })
+          return
+        }
+      }
+
+      // Fallback: ambil dari bank soal (belum dipublish)
       const { data } = await supabase.from('questions').select('*').eq('subject', bankSoal).order('created_at')
       let questions = data || []
-      // Jika ada limit, acak dan ambil sejumlah limit (simulasi seperti siswa)
       if (questionsLimit && questionsLimit > 0 && questions.length > questionsLimit) {
         questions = [...questions].sort(() => Math.random() - 0.5).slice(0, questionsLimit)
       }
       const totalSkor = questions.reduce((s, q) => s + (q.score || 1), 0)
-      setPreviewSoal({ subject: bankSoal, questions, totalBank: (data || []).length, limit: questionsLimit || 0, totalSkor })
+      setPreviewSoal({ subject: bankSoal, questions, totalBank: (data || []).length, limit: questionsLimit || 0, totalSkor, isPublished: false })
     } catch (err) {
       alert('Gagal load soal: ' + err.message)
     }
@@ -144,12 +165,46 @@ export const AdminSchedule = () => {
     setPublishing(exam.id)
     try {
       // Fetch all questions from bank soal
-      const { data: questions, error: qErr } = await supabase
+      const { data: allQuestions, error: qErr } = await supabase
         .from('questions')
         .select('id, question_text, type, options, correct_answer, score, matching_pairs, subject')
         .eq('subject', bankSoal)
 
       if (qErr) throw qErr
+
+      let selectedQuestions = allQuestions || []
+
+      // Pilih soal berdasarkan komposisi per tipe (jika diset)
+      const komposisi = meta.komposisi || {}
+      const hasKomposisi = Object.values(komposisi).some((v) => v > 0)
+
+      if (hasKomposisi) {
+        selectedQuestions = []
+        const typeMap = {
+          pilihan_ganda: ['pilihan_ganda', 'multiple_choice'],
+          pilihan_ganda_kompleks: ['pilihan_ganda_kompleks', 'multiple_choice_complex'],
+          benar_salah: ['benar_salah', 'true_false'],
+          menjodohkan: ['menjodohkan', 'matching'],
+          uraian_singkat: ['uraian_singkat', 'short_answer', 'essay'],
+        }
+
+        Object.entries(komposisi).forEach(([tipe, jumlah]) => {
+          if (jumlah <= 0) return
+          const validTypes = typeMap[tipe] || [tipe]
+          const pool = (allQuestions || []).filter((q) => validTypes.includes(q.type))
+          // Acak dan ambil sejumlah yang diminta
+          const shuffled = [...pool].sort(() => Math.random() - 0.5)
+          selectedQuestions.push(...shuffled.slice(0, jumlah))
+        })
+      } else if (meta.questions_limit && meta.questions_limit > 0 && selectedQuestions.length > meta.questions_limit) {
+        // Fallback: pakai questions_limit biasa (acak semua tipe)
+        selectedQuestions = [...selectedQuestions].sort(() => Math.random() - 0.5).slice(0, meta.questions_limit)
+      }
+
+      // Acak urutan final
+      if (meta.shuffle) {
+        selectedQuestions = [...selectedQuestions].sort(() => Math.random() - 0.5)
+      }
 
       const version = Date.now()
       const publishData = {
@@ -157,15 +212,15 @@ export const AdminSchedule = () => {
           id: exam.id,
           title: exam.title,
           duration: exam.duration,
-          questions_count: (questions || []).length,
+          questions_count: selectedQuestions.length,
           token: exam.token,
         },
-        questions: questions || [],
+        questions: selectedQuestions,
         meta,
         version,
       }
 
-      // Upsert to published_exams (1 row per exam)
+      // Upsert to published_exams (1 row per exam) — TERKUNCI
       const { error: pubErr } = await supabase
         .from('published_exams')
         .upsert({
@@ -177,7 +232,11 @@ export const AdminSchedule = () => {
 
       if (pubErr) throw pubErr
 
-      alert(`✅ Ujian "${exam.title}" berhasil dipublish!\nVersi: ${new Date(version).toLocaleString('id-ID')}\nJumlah soal: ${(questions || []).length}`)
+      // Update questions_count di exams table
+      await supabase.from('exams').update({ questions_count: selectedQuestions.length }).eq('id', exam.id)
+
+      const totalSkor = selectedQuestions.reduce((s, q) => s + (q.score || 1), 0)
+      alert(`✅ Ujian "${exam.title}" berhasil dipublish!\nVersi: ${new Date(version).toLocaleString('id-ID')}\nJumlah soal: ${selectedQuestions.length}\nTotal skor: ${totalSkor}`)
     } catch (err) {
       alert('❌ Gagal publish: ' + err.message)
     } finally {
@@ -219,6 +278,13 @@ export const AdminSchedule = () => {
           shuffle: form.shuffle,
           questions_limit: form.questions_limit || 0,
           save_answers: form.save_answers,
+          komposisi: {
+            pilihan_ganda: form.komposisi_pg || 0,
+            pilihan_ganda_kompleks: form.komposisi_pg_kompleks || 0,
+            benar_salah: form.komposisi_benar_salah || 0,
+            menjodohkan: form.komposisi_menjodohkan || 0,
+            uraian_singkat: form.komposisi_uraian || 0,
+          },
         }),
       }
 
@@ -248,6 +314,11 @@ export const AdminSchedule = () => {
         kelas: '',
         questions_limit: 0,
         save_answers: false,
+        komposisi_pg: 0,
+        komposisi_pg_kompleks: 0,
+        komposisi_benar_salah: 0,
+        komposisi_menjodohkan: 0,
+        komposisi_uraian: 0,
       })
     } catch (err) {
       alert('Gagal menyimpan: ' + err.message)
@@ -378,9 +449,40 @@ export const AdminSchedule = () => {
 
               {/* Jumlah Soal Ditampilkan */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Jumlah Soal Ditampilkan</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Jumlah Soal Ditampilkan (Total)</label>
                 <input type="number" value={form.questions_limit} onChange={(e) => setForm({ ...form, questions_limit: parseInt(e.target.value) || 0 })} min="0" placeholder="0 = semua soal" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
-                <p className="text-xs text-gray-400 mt-1">0 = tampilkan semua soal dari bank. Jika diisi (misal 30), hanya 30 soal acak yang ditampilkan ke siswa.</p>
+                <p className="text-xs text-gray-400 mt-1">0 = tampilkan semua soal. Atau gunakan komposisi per tipe di bawah (lebih presisi).</p>
+              </div>
+
+              {/* Komposisi Soal Per Tipe */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-sm font-medium text-gray-700 mb-3">Komposisi Soal Per Tipe <span className="text-xs text-gray-400 font-normal">(opsional, 0 = tidak dipakai)</span></p>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  <div>
+                    <label className="block text-[11px] text-gray-600 mb-1">Pilihan Ganda</label>
+                    <input type="number" value={form.komposisi_pg} onChange={(e) => setForm({ ...form, komposisi_pg: parseInt(e.target.value) || 0 })} min="0" className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm text-center" />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-gray-600 mb-1">PG Kompleks</label>
+                    <input type="number" value={form.komposisi_pg_kompleks} onChange={(e) => setForm({ ...form, komposisi_pg_kompleks: parseInt(e.target.value) || 0 })} min="0" className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm text-center" />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-gray-600 mb-1">Benar/Salah</label>
+                    <input type="number" value={form.komposisi_benar_salah} onChange={(e) => setForm({ ...form, komposisi_benar_salah: parseInt(e.target.value) || 0 })} min="0" className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm text-center" />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-gray-600 mb-1">Menjodohkan</label>
+                    <input type="number" value={form.komposisi_menjodohkan} onChange={(e) => setForm({ ...form, komposisi_menjodohkan: parseInt(e.target.value) || 0 })} min="0" className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm text-center" />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-gray-600 mb-1">Uraian Singkat</label>
+                    <input type="number" value={form.komposisi_uraian} onChange={(e) => setForm({ ...form, komposisi_uraian: parseInt(e.target.value) || 0 })} min="0" className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm text-center" />
+                  </div>
+                </div>
+                <p className="text-[11px] text-blue-600 mt-2 font-medium">
+                  Total: {(form.komposisi_pg || 0) + (form.komposisi_pg_kompleks || 0) + (form.komposisi_benar_salah || 0) + (form.komposisi_menjodohkan || 0) + (form.komposisi_uraian || 0)} soal
+                  {(form.komposisi_pg || 0) + (form.komposisi_pg_kompleks || 0) + (form.komposisi_benar_salah || 0) + (form.komposisi_menjodohkan || 0) + (form.komposisi_uraian || 0) > 0 && ' (komposisi aktif, questions_limit diabaikan)'}
+                </p>
               </div>
 
               {/* Simpan Jawaban ke Database */}
@@ -591,6 +693,11 @@ export const AdminSchedule = () => {
                                     kelas: m.kelas || '',
                                     questions_limit: m.questions_limit || 0,
                                     save_answers: m.save_answers || false,
+                                    komposisi_pg: m.komposisi?.pilihan_ganda || 0,
+                                    komposisi_pg_kompleks: m.komposisi?.pilihan_ganda_kompleks || 0,
+                                    komposisi_benar_salah: m.komposisi?.benar_salah || 0,
+                                    komposisi_menjodohkan: m.komposisi?.menjodohkan || 0,
+                                    komposisi_uraian: m.komposisi?.uraian_singkat || 0,
                                   })
                                   setEditId(exam.id)
                                   setShowForm(true)
@@ -601,7 +708,7 @@ export const AdminSchedule = () => {
                               </button>
                               {/* Preview Soal */}
                               <button
-                                onClick={() => handlePreviewSoal(meta.bank_soal || meta.subject, meta.questions_limit)}
+                                onClick={() => handlePreviewSoal(meta.bank_soal || meta.subject, meta.questions_limit, exam.id)}
                                 className="p-1.5 text-purple-600 hover:bg-purple-50 rounded" title="Preview Soal"
                               >
                                 <Eye size={14} />
@@ -644,7 +751,8 @@ export const AdminSchedule = () => {
                 <div>
                   <h3 className="font-bold text-lg">Preview Soal: {previewSoal.subject}</h3>
                   <p className="text-sm text-gray-500">
-                    {previewSoal.limit > 0
+                    {previewSoal.isPublished && <span className="text-green-600 font-semibold">🔒 TERKUNCI • </span>}
+                    {previewSoal.limit > 0 && !previewSoal.isPublished
                       ? `${previewSoal.questions.length} soal ditampilkan (dari ${previewSoal.totalBank} di bank) • Total skor: ${previewSoal.totalSkor}`
                       : `${previewSoal.questions.length} soal • Total skor: ${previewSoal.totalSkor}`
                     }
@@ -684,7 +792,7 @@ export const AdminSchedule = () => {
                   </div>
                 ))}
                 {previewSoal.questions.length === 0 && (
-                  <p className="text-center text-gray-500 py-8">Tidak ada soal di bank soal ini</p>
+                  <p className="text-center text-gray-500 py-8">Tidak ada soal. Publish ujian dulu untuk mengunci soal.</p>
                 )}
               </div>
             </div>
