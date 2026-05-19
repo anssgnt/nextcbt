@@ -60,6 +60,16 @@ export const useExamStore = create(
     }),
     {
       name: 'exam-storage',
+      // Exclude timeRemaining from persistence — it changes every second
+      // and is recalculated from exam_start_{id} on mount anyway
+      partialize: (state) => ({
+        currentExam: state.currentExam,
+        answers: state.answers,
+        markedQuestions: state.markedQuestions,
+        currentQuestionIndex: state.currentQuestionIndex,
+        isSubmitted: state.isSubmitted,
+        sessionId: state.sessionId,
+      }),
     }
   )
 )

@@ -15,6 +15,8 @@ export const AdminResults = () => {
   const [regradeResult, setRegradeResult] = useState(null)
   const [students, setStudents] = useState([])
   const [classReportExam, setClassReportExam] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const pageSize = 25
 
   useEffect(() => {
     loadResults()
@@ -33,7 +35,7 @@ export const AdminResults = () => {
     try {
       const { data, error } = await supabase
         .from('exam_sessions')
-        .select('id, score, status, submitted_at, student_id, exam_id, students(name, class_name), exams(title)')
+        .select('id, score, status, submitted_at, student_id, exam_id, violations, students(name, class_name), exams(title)')
         .eq('status', 'submitted')
         .order('submitted_at', { ascending: false })
 
@@ -47,6 +49,7 @@ export const AdminResults = () => {
         className: r.students?.class_name || '-',
         exam: r.exams?.title || '-',
         score: r.score || 0,
+        violations: r.violations || 0,
         status: (r.score || 0) >= 70 ? 'Lulus' : 'Tidak Lulus',
         date: r.submitted_at ? new Date(r.submitted_at).toLocaleDateString('id-ID') : '-',
       }))
@@ -60,6 +63,13 @@ export const AdminResults = () => {
 
   const exams = [...new Set(results.map((r) => r.exam))]
   const filteredResults = selectedExam === 'all' ? results : results.filter((r) => r.exam === selectedExam)
+
+  // Pagination
+  const totalPages = Math.ceil(filteredResults.length / pageSize)
+  const paginatedResults = filteredResults.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+
+  // Reset page when filter changes
+  useEffect(() => { setCurrentPage(1) }, [selectedExam])
 
   // Re-grade: hitung ulang semua nilai dengan algoritma normalisasi baru
   const handleReGradeAll = async () => {
@@ -159,11 +169,19 @@ export const AdminResults = () => {
   }
 
   const handleExportResults = () => {
+    const escapeCsv = (val) => {
+      const str = String(val ?? '')
+      if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        return `"${str.replace(/"/g, '""')}"`
+      }
+      return str
+    }
     const csv = [
-      ['Nama Siswa', 'Kelas', 'Ujian', 'Nilai', 'Tanggal'],
-      ...filteredResults.map((r) => [r.studentName, r.className, r.exam, r.score, r.date]),
+      ['Nama Siswa', 'Kelas', 'Ujian', 'Nilai', 'Pelanggaran', 'Tanggal'],
+      ...filteredResults.map((r) => [escapeCsv(r.studentName), escapeCsv(r.className), escapeCsv(r.exam), r.score, r.violations, r.date]),
     ].map((row) => row.join(',')).join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
+    const bom = '\uFEFF' // UTF-8 BOM for Excel compatibility
+    const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8' })
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -184,9 +202,9 @@ export const AdminResults = () => {
     w.document.write(`<p><b>Jumlah Peserta:</b> ${filteredResults.length}</p>`)
     w.document.write(`<p><b>Rata-rata:</b> ${avgScore}</p>`)
     w.document.write(`<p><b>Kelulusan:</b> ${passRate}% (${passCount} dari ${totalStudents})</p>`)
-    w.document.write(`<table><thead><tr><th style="width:30px">No</th><th>Nama Siswa</th><th>Kelas</th><th>Ujian</th><th style="width:60px">Nilai</th><th>Tanggal</th></tr></thead><tbody>`)
+    w.document.write(`<table><thead><tr><th style="width:30px">No</th><th>Nama Siswa</th><th>Kelas</th><th>Ujian</th><th style="width:60px">Nilai</th><th style="width:80px">Pelanggaran</th><th>Tanggal</th></tr></thead><tbody>`)
     filteredResults.forEach((r, idx) => {
-      w.document.write(`<tr><td>${idx + 1}</td><td>${r.studentName}</td><td>${r.className}</td><td>${r.exam}</td><td class="${r.score >= 70 ? 'pass' : 'fail'}">${r.score}</td><td>${r.date}</td></tr>`)
+      w.document.write(`<tr><td>${idx + 1}</td><td>${r.studentName}</td><td>${r.className}</td><td>${r.exam}</td><td class="${r.score >= 70 ? 'pass' : 'fail'}">${r.score}</td><td>${r.violations > 0 ? r.violations + '×' : '-'}</td><td>${r.date}</td></tr>`)
     })
     w.document.write(`</tbody></table>`)
     w.document.write(`<p style="margin-top:30px;font-size:10px;color:#666">Dicetak: ${new Date().toLocaleString('id-ID')}</p>`)
@@ -299,6 +317,7 @@ export const AdminResults = () => {
               {filteredResults.length === 0 ? (
                 <p className="text-center text-gray-500 py-8">Belum ada hasil ujian</p>
               ) : (
+                <>
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 border-b">
                     <tr>
@@ -306,17 +325,25 @@ export const AdminResults = () => {
                       <th className="px-4 py-3 text-left font-semibold">Kelas</th>
                       <th className="px-4 py-3 text-left font-semibold">Ujian</th>
                       <th className="px-4 py-3 text-left font-semibold">Nilai</th>
+                      <th className="px-4 py-3 text-left font-semibold">Pelanggaran</th>
                       <th className="px-4 py-3 text-left font-semibold">Tanggal</th>
                       <th className="px-4 py-3 text-left font-semibold">Aksi</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredResults.map((r) => (
+                    {paginatedResults.map((r) => (
                       <tr key={r.id} className="border-b hover:bg-gray-50">
                         <td className="px-4 py-3 font-medium">{r.studentName}</td>
                         <td className="px-4 py-3"><span className="px-2 py-1 bg-purple-50 text-purple-700 rounded text-xs font-medium">{r.className}</span></td>
                         <td className="px-4 py-3">{r.exam}</td>
                         <td className="px-4 py-3"><span className={`font-bold ${r.score >= 70 ? 'text-green-600' : 'text-red-600'}`}>{r.score}</span></td>
+                        <td className="px-4 py-3">
+                          {r.violations > 0 ? (
+                            <span className="px-2 py-1 bg-red-50 text-red-700 rounded text-xs font-bold">{r.violations}×</span>
+                          ) : (
+                            <span className="text-gray-400 text-xs">—</span>
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-gray-600">{r.date}</td>
                         <td className="px-4 py-3">
                           <button
@@ -336,6 +363,48 @@ export const AdminResults = () => {
                     ))}
                   </tbody>
                 </table>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between px-4 py-3 border-t">
+                    <p className="text-sm text-gray-600">
+                      Menampilkan {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, filteredResults.length)} dari {filteredResults.length}
+                    </p>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                        className="px-3 py-1.5 text-sm border rounded-lg disabled:opacity-40 hover:bg-gray-50"
+                      >
+                        ←
+                      </button>
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        let page
+                        if (totalPages <= 5) page = i + 1
+                        else if (currentPage <= 3) page = i + 1
+                        else if (currentPage >= totalPages - 2) page = totalPages - 4 + i
+                        else page = currentPage - 2 + i
+                        return (
+                          <button
+                            key={page}
+                            onClick={() => setCurrentPage(page)}
+                            className={`px-3 py-1.5 text-sm border rounded-lg ${currentPage === page ? 'bg-blue-600 text-white border-blue-600' : 'hover:bg-gray-50'}`}
+                          >
+                            {page}
+                          </button>
+                        )
+                      })}
+                      <button
+                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages}
+                        className="px-3 py-1.5 text-sm border rounded-lg disabled:opacity-40 hover:bg-gray-50"
+                      >
+                        →
+                      </button>
+                    </div>
+                  </div>
+                )}
+                </>
               )}
             </CardContent>
           </Card>

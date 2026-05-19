@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BookOpen, Download, CheckCircle, Loader2, Wifi, WifiOff, KeyRound, X, Clock } from 'lucide-react'
+import { BookOpen, Download, CheckCircle, Loader2, Wifi, WifiOff, KeyRound, X, Clock, PlayCircle } from 'lucide-react'
 import { useAuthStore } from '../store'
 import { supabase } from '../lib/supabase'
 import { StudentLayout } from '../layouts/StudentLayout'
@@ -21,9 +21,10 @@ export const ExamPage = () => {
   const [syncError, setSyncError] = useState(null)
   const [loadError, setLoadError] = useState(null)
   const [completedExams, setCompletedExams] = useState({})
+  const [inProgressExams, setInProgressExams] = useState({})
   const isOnline = navigator.onLine
 
-  useEffect(() => { loadExams(); loadCompletedStatus(); retryPendingSubmissions() }, [])
+  useEffect(() => { loadExams(); loadCompletedStatus().then(() => retryPendingSubmissions()) }, [])
 
   // Retry pending submissions yang gagal (offline/error)
   const retryPendingSubmissions = async () => {
@@ -35,30 +36,63 @@ export const ExamPage = () => {
         const allAnswers = JSON.parse(localStorage.getItem(key))
         if (!allAnswers) continue
 
-        // Cek apakah sudah ada session (jangan duplikat)
-        const { data: existing } = await queuedFetch(
-          supabase.from('exam_sessions').select('id').eq('student_id', user.id).eq('exam_id', examId).eq('status', 'submitted').maybeSingle()
+        // Cek apakah sudah ada session (submitted ATAU in_progress) — jangan duplikat
+        const { data: existingRows } = await queuedFetch(
+          supabase.from('exam_sessions')
+            .select('id, status')
+            .eq('student_id', user.id)
+            .eq('exam_id', examId)
+            .in('status', ['submitted', 'in_progress'])
+            .limit(1)
         )
-        if (existing) {
+        const existing = existingRows?.[0] || null
+
+        if (existing?.status === 'submitted') {
+          // Sudah submitted, hapus pending
           localStorage.removeItem(key)
           continue
         }
 
-        // Submit
-        const { data: sessionData } = await queuedFetch(
-          supabase.from('exam_sessions').insert({
-            student_id: user.id, exam_id: examId, status: 'submitted',
-            score: 0, submitted_at: new Date().toISOString(),
-          }).select('id').single()
-        )
+        // Hitung score dari jawaban yang tersimpan
+        let score = 0
+        try {
+          const examDataRaw = localStorage.getItem(`exam_data_${examId}`)
+          if (examDataRaw) {
+            const examData = JSON.parse(examDataRaw)
+            const questions = examData.questions || []
+            let earned = 0, total = 0
+            questions.forEach((q) => {
+              const weight = q.score || 1
+              total += weight
+              const a = allAnswers[q.id]
+              if (!a) return
+              if (q.correct_answer && a === q.correct_answer) earned += weight
+            })
+            score = total > 0 ? Math.round((earned / total) * 100) : 0
+          }
+        } catch {} // Fallback score = 0 jika exam_data tidak ada
 
-        if (sessionData?.id) {
-          localStorage.removeItem(key)
-          // Mark completed
-          const completed = JSON.parse(localStorage.getItem('completed_exams') || '{}')
-          completed[examId] = Date.now()
-          localStorage.setItem('completed_exams', JSON.stringify(completed))
+        // Submit (update jika in_progress, insert jika belum ada)
+        if (existing?.status === 'in_progress') {
+          await queuedFetch(
+            supabase.from('exam_sessions')
+              .update({ status: 'submitted', score, submitted_at: new Date().toISOString() })
+              .eq('id', existing.id)
+          )
+        } else {
+          await queuedFetch(
+            supabase.from('exam_sessions').insert({
+              student_id: user.id, exam_id: examId, status: 'submitted',
+              score, submitted_at: new Date().toISOString(),
+            }).select('id').single()
+          )
         }
+
+        localStorage.removeItem(key)
+        // Mark completed
+        const completed = JSON.parse(localStorage.getItem('completed_exams') || '{}')
+        completed[examId] = Date.now()
+        localStorage.setItem('completed_exams', JSON.stringify(completed))
       } catch {
         // Still offline or error, will retry next time
       }
@@ -69,33 +103,111 @@ export const ExamPage = () => {
   const loadCompletedStatus = async () => {
     if (!user?.id) return
     try {
+      // Single query: fetch both submitted & in_progress sessions
       const { data } = await queuedFetch(
-        supabase.from('exam_sessions').select('exam_id').eq('student_id', user.id).eq('status', 'submitted')
+        supabase.from('exam_sessions')
+          .select('exam_id, status')
+          .eq('student_id', user.id)
+          .in('status', ['submitted', 'in_progress'])
       )
-      const map = {}
-      ;(data || []).forEach((s) => { map[s.exam_id] = true })
-      setCompletedExams(map)
 
-      // Sync localStorage dengan data terbaru dari server
-      // Hapus completed_exams yang sudah tidak ada di DB (remidi)
+      const submittedMap = {}
+      const progressMap = {}
+      ;(data || []).forEach((s) => {
+        if (s.status === 'submitted') submittedMap[s.exam_id] = true
+        else if (s.status === 'in_progress') progressMap[s.exam_id] = true
+      })
+      setCompletedExams(submittedMap)
+      setInProgressExams(progressMap)
+
+      // === FULL CLEANUP: Hapus SEMUA cache lokal yang tidak cocok dengan server ===
+      // Ini menangani: remidi dari submitted, remidi dari in_progress, dan stale data
+
       const oldCompleted = JSON.parse(localStorage.getItem('completed_exams') || '{}')
+
+      // 1. Cari exam yang dulu completed tapi sekarang tidak ada di server (remidi)
+      const remidiFromCompleted = Object.keys(oldCompleted).filter((id) => !submittedMap[id])
+
+      // 2. Cari exam yang punya exam_start_ tapi TIDAK ada di server sama sekali
+      //    (admin hapus session in_progress → siswa harus mulai fresh)
+      const remidiFromProgress = Object.keys(localStorage)
+        .filter((k) => k.startsWith('exam_start_'))
+        .map((k) => k.replace('exam_start_', ''))
+        .filter((id) => !submittedMap[id] && !progressMap[id])
+
+      // 3. Gabungkan semua exam yang perlu di-cleanup
+      const allRemidiExams = [...new Set([...remidiFromCompleted, ...remidiFromProgress])]
+
+      if (allRemidiExams.length > 0) {
+        console.log('[CBT] Cache cleanup for:', allRemidiExams)
+        allRemidiExams.forEach((examId) => {
+          localStorage.removeItem(`exam_data_${examId}`)
+          localStorage.removeItem(`exam_start_${examId}`)
+          localStorage.removeItem(`answers_${examId}`)
+          localStorage.removeItem(`exam_result_${examId}`)
+          localStorage.removeItem(`pending_submit_${examId}`)
+          localStorage.removeItem(`session_created_${examId}`)
+        })
+
+        // Clear Zustand exam-storage jika berisi data ujian yang di-cleanup
+        try {
+          const examStorage = JSON.parse(localStorage.getItem('exam-storage') || '{}')
+          const storedExamId = examStorage.state?.currentExam?.id
+          if (storedExamId && allRemidiExams.includes(storedExamId)) {
+            localStorage.removeItem('exam-storage')
+          }
+        } catch {}
+
+        // Bersihkan synced_exams
+        const syncedExamsLocal = JSON.parse(localStorage.getItem('synced_exams') || '{}')
+        allRemidiExams.forEach((examId) => { delete syncedExamsLocal[examId] })
+        localStorage.setItem('synced_exams', JSON.stringify(syncedExamsLocal))
+        setSyncedExams(syncedExamsLocal)
+
+        // Bersihkan exam_versions
+        const versions = JSON.parse(localStorage.getItem('exam_versions') || '{}')
+        allRemidiExams.forEach((examId) => { delete versions[examId] })
+        localStorage.setItem('exam_versions', JSON.stringify(versions))
+      }
+
+      // Update completed_exams — hanya simpan yang masih valid di server
       const newCompleted = {}
       Object.keys(oldCompleted).forEach((examId) => {
-        if (map[examId]) newCompleted[examId] = oldCompleted[examId]
+        if (submittedMap[examId]) newCompleted[examId] = oldCompleted[examId]
       })
       localStorage.setItem('completed_exams', JSON.stringify(newCompleted))
 
-      // Hapus cache result & answers untuk ujian yang sudah di-remidi
-      Object.keys(oldCompleted).forEach((examId) => {
-        if (!map[examId]) {
-          localStorage.removeItem(`exam_result_${examId}`)
-          localStorage.removeItem(`answers_${examId}`)
+      // === CLEANUP submitted yang masih punya sisa lokal ===
+      Object.keys(localStorage).filter((k) => k.startsWith('exam_start_')).forEach((k) => {
+        const examId = k.replace('exam_start_', '')
+        if (submittedMap[examId]) {
           localStorage.removeItem(`exam_start_${examId}`)
+          localStorage.removeItem(`answers_${examId}`)
+          localStorage.removeItem(`session_created_${examId}`)
         }
       })
+
+      // Tambahkan localStorage fallback untuk in_progress (offline support)
+      Object.keys(localStorage).filter((k) => k.startsWith('exam_start_')).forEach((k) => {
+        const examId = k.replace('exam_start_', '')
+        if (!submittedMap[examId] && !progressMap[examId]) {
+          // Sudah di-cleanup di atas, skip
+        } else if (!submittedMap[examId]) {
+          progressMap[examId] = true
+        }
+      })
+      setInProgressExams({ ...progressMap })
+
     } catch {
       // Fallback ke localStorage jika offline
       try { setCompletedExams(JSON.parse(localStorage.getItem('completed_exams') || '{}')) } catch {}
+      const localProgress = {}
+      const completed = JSON.parse(localStorage.getItem('completed_exams') || '{}')
+      Object.keys(localStorage).filter((k) => k.startsWith('exam_start_')).forEach((k) => {
+        const examId = k.replace('exam_start_', '')
+        if (!completed[examId]) localProgress[examId] = true
+      })
+      setInProgressExams(localProgress)
     }
   }
 
@@ -199,7 +311,7 @@ export const ExamPage = () => {
         }
       }
 
-      // Simpan ke localStorage
+      // Simpan ke localStorage dengan size check
       const examData = {
         exam: { id: exam.id, title: exam.title, duration: exam.duration, questions_count: questions.length },
         questions,
@@ -207,7 +319,26 @@ export const ExamPage = () => {
         version,
         meta: JSON.parse(exam.description || '{}'),
       }
-      localStorage.setItem(`exam_data_${exam.id}`, JSON.stringify(examData))
+      const payload = JSON.stringify(examData)
+
+      // Size check: warn jika > 4MB (localStorage limit ~5-10MB)
+      if (payload.length > 4 * 1024 * 1024) {
+        // Strip image base64 dari soal untuk hemat space
+        examData.questions = questions.map(({ image_url, ...q }) => ({
+          ...q,
+          image_url: image_url && image_url.startsWith('data:') ? null : image_url,
+        }))
+      }
+
+      try {
+        localStorage.setItem(`exam_data_${exam.id}`, JSON.stringify(examData))
+      } catch (e) {
+        // localStorage full — clear old exam data dan retry
+        Object.keys(localStorage)
+          .filter((k) => k.startsWith('exam_data_') && k !== `exam_data_${exam.id}`)
+          .forEach((k) => localStorage.removeItem(k))
+        localStorage.setItem(`exam_data_${exam.id}`, JSON.stringify(examData))
+      }
 
       const newSynced = { ...syncedExams, [exam.id]: Date.now() }
       setSyncedExams(newSynced)
@@ -270,7 +401,25 @@ export const ExamPage = () => {
         version,
         meta: JSON.parse(exam.description || '{}'),
       }
-      localStorage.setItem(`exam_data_${exam.id}`, JSON.stringify(examData))
+
+      // Size check: strip base64 images jika > 4MB
+      const payload = JSON.stringify(examData)
+      if (payload.length > 4 * 1024 * 1024) {
+        examData.questions = questions.map(({ image_url, ...q }) => ({
+          ...q,
+          image_url: image_url && image_url.startsWith('data:') ? null : image_url,
+        }))
+      }
+
+      try {
+        localStorage.setItem(`exam_data_${exam.id}`, JSON.stringify(examData))
+      } catch (e) {
+        // localStorage full — clear old exam data dan retry
+        Object.keys(localStorage)
+          .filter((k) => k.startsWith('exam_data_') && k !== `exam_data_${exam.id}`)
+          .forEach((k) => localStorage.removeItem(k))
+        localStorage.setItem(`exam_data_${exam.id}`, JSON.stringify(examData))
+      }
 
       const newSynced = { ...syncedExams, [exam.id]: Date.now() }
       setSyncedExams(newSynced)
@@ -391,17 +540,25 @@ export const ExamPage = () => {
 
                   {/* Masuk Ujian button */}
                   <button
-                    onClick={() => handleMasukUjian(exam)}
-                    disabled={!isSynced || !!completedExams[exam.id]}
+                    onClick={() => inProgressExams[exam.id] ? navigate(`/exam/${exam.id}`) : handleMasukUjian(exam)}
+                    disabled={(!isSynced && !inProgressExams[exam.id]) || !!completedExams[exam.id]}
                     className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition active:scale-95 ${
                       completedExams[exam.id]
                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : inProgressExams[exam.id]
+                        ? 'bg-orange-500 text-white hover:bg-orange-600'
                         : isSynced
                         ? 'bg-blue-600 text-white hover:bg-blue-700'
                         : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     }`}
                   >
-                    <KeyRound size={16} /> {completedExams[exam.id] ? 'Sudah Ujian' : 'Masuk Ujian'}
+                    {completedExams[exam.id] ? (
+                      <><CheckCircle size={16} /> Sudah Ujian</>
+                    ) : inProgressExams[exam.id] ? (
+                      <><PlayCircle size={16} /> Lanjutkan Mengerjakan</>
+                    ) : (
+                      <><KeyRound size={16} /> Masuk Ujian</>
+                    )}
                   </button>
                 </div>
 

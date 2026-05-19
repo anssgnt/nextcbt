@@ -42,7 +42,7 @@ export function ProfilePage() {
         {/* Reset Aplikasi */}
         <button
           onClick={async () => {
-            if (!confirm('Reset aplikasi akan menghapus semua data lokal. Anda perlu login & sync ulang. Lanjutkan?')) return
+            if (!confirm('Reset aplikasi akan menghapus cache ujian. Anda perlu sync ulang soal. Lanjutkan?')) return
             try {
               if ('serviceWorker' in navigator) {
                 const registrations = await navigator.serviceWorker.getRegistrations()
@@ -52,11 +52,24 @@ export function ProfilePage() {
                 const keys = await caches.keys()
                 await Promise.all(keys.map((k) => caches.delete(k)))
               }
-              localStorage.clear()
-              window.location.href = '/student/login'
+              // Hapus semua cache ujian tapi PERTAHANKAN auth
+              const authData = localStorage.getItem('auth-storage')
+              const keysToRemove = Object.keys(localStorage).filter((k) =>
+                k !== 'auth-storage'
+              )
+              keysToRemove.forEach((k) => localStorage.removeItem(k))
+              if (authData) localStorage.setItem('auth-storage', authData)
+              navigate('/student/dashboard')
+              window.location.reload()
             } catch {
-              localStorage.clear()
-              window.location.href = '/student/login'
+              const authData = localStorage.getItem('auth-storage')
+              const keysToRemove = Object.keys(localStorage).filter((k) =>
+                k !== 'auth-storage'
+              )
+              keysToRemove.forEach((k) => localStorage.removeItem(k))
+              if (authData) localStorage.setItem('auth-storage', authData)
+              navigate('/student/dashboard')
+              window.location.reload()
             }
           }}
           className="w-full mt-3 bg-gray-100 text-gray-600 py-3 rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-gray-200 transition text-sm"

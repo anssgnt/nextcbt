@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Button, Modal, Toast } from '../components'
 import { useExamStore, useAuthStore } from '../store'
 import { useExamTimer, useTabVisibility, useOnlineStatus } from '../hooks/useExam'
 import { formatTime, debounce, isEssayCorrect, isMatchingCorrect } from '../utils/helpers'
 import { RichText } from '../components/RichText'
-import { List, ChevronLeft, ChevronRight } from 'lucide-react'
+import { List, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 
 export const ExamInterfacePage = () => {
   const { examId } = useParams()
@@ -30,6 +30,8 @@ export const ExamInterfacePage = () => {
   const [examMeta, setExamMeta] = useState({})
   const [warningCountdown, setWarningCountdown] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitPhase, setSubmitPhase] = useState('') // 'queue' | 'sending' | 'saving'
+  const submitLock = useRef(false)
   const isOnline = useOnlineStatus()
 
   const { timeRemaining, isTimeUp } = useExamTimer(currentExam?.duration, examId)
@@ -91,6 +93,13 @@ export const ExamInterfacePage = () => {
         setTimeout(() => navigate('/student/exams'), 2000)
         return
       }
+
+      // Validasi: jika exam-storage punya data dari ujian lain, reset dulu
+      const { currentExam: storedExam, resetExam: doReset } = useExamStore.getState()
+      if (storedExam && storedExam.id !== examId) {
+        resetExam()
+      }
+
       const examData = JSON.parse(cached)
       setCurrentExam(examData.exam)
       setExamMeta(examData.meta || {})
@@ -138,8 +147,12 @@ export const ExamInterfacePage = () => {
   }
 
   const handleSubmitExam = async () => {
-    if (isSubmitting) return // Prevent double submit
+    // Use ref lock (synchronous) to prevent race between isTimeUp auto-submit and manual submit
+    if (submitLock.current) return
+    submitLock.current = true
     setIsSubmitting(true)
+    setSubmitPhase('queue')
+    setShowSubmitModal(false) // Close modal immediately to prevent re-click
     try {
       const savedAnswers = JSON.parse(localStorage.getItem(`answers_${examId}`) || '{}')
       const allAnswers = { ...savedAnswers, ...answers }
@@ -147,27 +160,61 @@ export const ExamInterfacePage = () => {
 
       if (isOnline) {
         try {
-          const { queuedFetch } = await import('../utils/requestQueue')
+          const { queuedFetch, staggeredDelay } = await import('../utils/requestQueue')
           const { supabase } = await import('../lib/supabase')
 
-          // Random delay 0-3 detik untuk menghindari 1000 siswa hit server bersamaan
-          await new Promise((r) => setTimeout(r, Math.random() * 3000))
+          // Smart staggered delay: spread 1000 siswa across 5 seconds
+          // Deterministic per user — same student always gets same delay
+          await staggeredDelay(user?.id || 'unknown', 5000)
 
-          // Cek apakah sudah pernah submit ujian ini
-          const { data: existing } = await queuedFetch(
+          setSubmitPhase('sending')
+
+          // Cek apakah sudah pernah submit ATAU ada session in_progress
+          const { data: existingRows } = await queuedFetch(
             supabase.from('exam_sessions')
-              .select('id')
+              .select('id, status')
               .eq('student_id', user?.id)
               .eq('exam_id', examId)
-              .eq('status', 'submitted')
-              .maybeSingle()
+              .in('status', ['submitted', 'in_progress'])
+              .limit(1)
           )
+          const existing = existingRows?.[0] || null
 
-          if (existing) {
+          if (existing?.status === 'submitted') {
             // Sudah pernah submit, skip insert, langsung ke result
             setToast({ type: 'info', message: 'Ujian sudah pernah disubmit' })
+          } else if (existing?.status === 'in_progress') {
+            // Update session yang sudah ada (dari crash recovery)
+            await queuedFetch(
+              supabase.from('exam_sessions')
+                .update({
+                  status: 'submitted',
+                  score: finalScore,
+                  submitted_at: new Date().toISOString(),
+                  violations: violations,
+                })
+                .eq('id', existing.id)
+            )
+
+            // Simpan jawaban jika save_answers ON
+            if (examMeta.save_answers) {
+              setSubmitPhase('saving')
+              const answersToInsert = Object.entries(allAnswers)
+                .filter(([, val]) => val !== null && val !== undefined && val !== '')
+                .map(([questionId, answerValue]) => ({
+                  session_id: existing.id,
+                  question_id: questionId,
+                  answer_text: typeof answerValue === 'object' ? JSON.stringify(answerValue) : String(answerValue),
+                  answered_at: new Date().toISOString(),
+                }))
+              if (answersToInsert.length > 0) {
+                await queuedFetch(
+                  supabase.from('answers').upsert(answersToInsert, { onConflict: 'session_id,question_id' })
+                )
+              }
+            }
           } else {
-            // 1. Insert exam_session dan ambil ID-nya (retry up to 2x)
+            // Belum ada session — insert baru (retry up to 2x)
             let sessionData = null
             for (let attempt = 0; attempt < 3; attempt++) {
               try {
@@ -175,35 +222,37 @@ export const ExamInterfacePage = () => {
                   supabase.from('exam_sessions').insert({
                     student_id: user?.id, exam_id: examId, status: 'submitted',
                     score: finalScore, submitted_at: new Date().toISOString(),
+                    violations: violations,
                   }).select('id').single()
                 )
                 if (error) throw error
                 sessionData = data
-              break
-            } catch (e) {
-              if (attempt === 2) throw e
-              await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)))
+                break
+              } catch (e) {
+                if (attempt === 2) throw e
+                await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)))
+              }
+            }
+
+            // Simpan jawaban per soal ke tabel answers (single batch) - hanya jika save_answers ON
+            if (sessionData?.id && examMeta.save_answers) {
+              setSubmitPhase('saving')
+              const answersToInsert = Object.entries(allAnswers)
+                .filter(([, val]) => val !== null && val !== undefined && val !== '')
+                .map(([questionId, answerValue]) => ({
+                  session_id: sessionData.id,
+                  question_id: questionId,
+                  answer_text: typeof answerValue === 'object' ? JSON.stringify(answerValue) : String(answerValue),
+                  answered_at: new Date().toISOString(),
+                }))
+
+              if (answersToInsert.length > 0) {
+                await queuedFetch(
+                  supabase.from('answers').upsert(answersToInsert, { onConflict: 'session_id,question_id' })
+                )
+              }
             }
           }
-
-          // 2. Simpan jawaban per soal ke tabel answers (single batch) - hanya jika save_answers ON
-          if (sessionData?.id && examMeta.save_answers) {
-            const answersToInsert = Object.entries(allAnswers)
-              .filter(([, val]) => val !== null && val !== undefined && val !== '')
-              .map(([questionId, answerValue]) => ({
-                session_id: sessionData.id,
-                question_id: questionId,
-                answer_text: typeof answerValue === 'object' ? JSON.stringify(answerValue) : String(answerValue),
-                answered_at: new Date().toISOString(),
-              }))
-
-            if (answersToInsert.length > 0) {
-              await queuedFetch(
-                supabase.from('answers').upsert(answersToInsert, { onConflict: 'session_id,question_id' })
-              )
-            }
-          }
-          } // close else (not existing)
         } catch { localStorage.setItem(`pending_submit_${examId}`, JSON.stringify(allAnswers)) }
       } else {
         localStorage.setItem(`pending_submit_${examId}`, JSON.stringify(allAnswers))
@@ -241,6 +290,7 @@ export const ExamInterfacePage = () => {
 
       localStorage.removeItem(`answers_${examId}`)
       localStorage.removeItem(`exam_start_${examId}`)
+      localStorage.removeItem(`session_created_${examId}`)
       // Mark as completed
       const completed = JSON.parse(localStorage.getItem('completed_exams') || '{}')
       completed[examId] = Date.now()
@@ -249,7 +299,11 @@ export const ExamInterfacePage = () => {
       try { document.exitFullscreen?.() } catch {}
       resetExam()
       navigate(`/result/${examId}`)
-    } catch { setToast({ type: 'error', message: 'Gagal submit' }); setIsSubmitting(false) }
+    } catch (err) {
+      setToast({ type: 'error', message: 'Gagal submit. Jawaban tersimpan lokal, akan dikirim ulang.' })
+      setIsSubmitting(false)
+      submitLock.current = false
+    }
   }
 
   const calculateScore = (answersMap) => {
@@ -508,14 +562,84 @@ export const ExamInterfacePage = () => {
         </div>
       )}
 
+      {/* Fullscreen loading overlay saat submit */}
+      {isSubmitting && (
+        <div className="fixed inset-0 bg-white/95 z-[9999] flex flex-col items-center justify-center">
+          <Loader2 size={48} className="animate-spin text-blue-600 mb-4" />
+          <p className="text-lg font-semibold text-gray-800">
+            {submitPhase === 'queue' && 'Menunggu antrian...'}
+            {submitPhase === 'sending' && 'Mengirim jawaban...'}
+            {submitPhase === 'saving' && 'Menyimpan detail...'}
+            {!submitPhase && 'Memproses...'}
+          </p>
+          <p className="text-sm text-gray-500 mt-2">
+            {submitPhase === 'queue'
+              ? 'Server sedang sibuk, jawaban Anda aman'
+              : 'Mohon tunggu, jangan tutup halaman ini'}
+          </p>
+          {submitPhase === 'queue' && (
+            <div className="mt-4 w-48 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+              <div className="h-full bg-blue-500 rounded-full animate-pulse" style={{ width: '60%' }}></div>
+            </div>
+          )}
+        </div>
+      )}
+
       <Modal isOpen={showSubmitModal} onClose={() => setShowSubmitModal(false)} title="Kumpulkan Jawaban">
         <div className="space-y-4">
-          <p className="text-gray-700 text-sm">Yakin ingin mengumpulkan? {answeredCount} dari {questions.length} soal dijawab.</p>
-          {!isOnline && <p className="text-xs text-yellow-700 bg-yellow-50 p-2 rounded-lg">Offline. Jawaban dikirim saat online.</p>}
-          <div className="flex gap-3">
-            <Button variant="secondary" onClick={() => setShowSubmitModal(false)}>Batal</Button>
-            <Button onClick={handleSubmitExam}>Kumpulkan</Button>
-          </div>
+          {(() => {
+            // Cek minimal waktu mengerjakan dari settings
+            const cbtSettings = JSON.parse(localStorage.getItem('cbt_settings') || '{}')
+            const minWorkingTime = cbtSettings.minWorkingTime || 0 // dalam menit
+            const startTime = parseInt(localStorage.getItem(`exam_start_${examId}`) || '0')
+            const elapsedMinutes = startTime > 0 ? Math.floor((Date.now() - startTime) / 60000) : 0
+            const remainingMinutes = Math.max(0, minWorkingTime - elapsedMinutes)
+            const canSubmitTime = remainingMinutes <= 0
+
+            if (answeredCount === 0) {
+              return (
+                <>
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                    <p className="text-red-700 text-sm font-medium">⚠️ Anda belum menjawab satupun soal.</p>
+                    <p className="text-red-600 text-xs mt-1">Jawab minimal 1 soal sebelum mengumpulkan.</p>
+                  </div>
+                  <Button variant="secondary" onClick={() => setShowSubmitModal(false)} className="w-full">Kembali Mengerjakan</Button>
+                </>
+              )
+            }
+
+            if (!canSubmitTime) {
+              return (
+                <>
+                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                    <p className="text-orange-700 text-sm font-medium">⏱️ Belum bisa mengumpulkan</p>
+                    <p className="text-orange-600 text-xs mt-1">
+                      Minimal mengerjakan {minWorkingTime} menit. Sisa waktu tunggu: <span className="font-bold">{remainingMinutes} menit</span> lagi.
+                    </p>
+                  </div>
+                  <Button variant="secondary" onClick={() => setShowSubmitModal(false)} className="w-full">Kembali Mengerjakan</Button>
+                </>
+              )
+            }
+
+            return (
+              <>
+                <p className="text-gray-700 text-sm">Yakin ingin mengumpulkan? {answeredCount} dari {questions.length} soal dijawab.</p>
+                {answeredCount < questions.length && (
+                  <p className="text-xs text-orange-700 bg-orange-50 p-2 rounded-lg">
+                    ⚠️ Masih ada {questions.length - answeredCount} soal yang belum dijawab.
+                  </p>
+                )}
+                {!isOnline && <p className="text-xs text-yellow-700 bg-yellow-50 p-2 rounded-lg">Offline. Jawaban dikirim saat online.</p>}
+                <div className="flex gap-3">
+                  <Button variant="secondary" onClick={() => setShowSubmitModal(false)} disabled={isSubmitting}>Batal</Button>
+                  <Button onClick={handleSubmitExam} disabled={isSubmitting}>
+                    {isSubmitting ? 'Mengirim...' : 'Kumpulkan'}
+                  </Button>
+                </div>
+              </>
+            )
+          })()}
         </div>
       </Modal>
 

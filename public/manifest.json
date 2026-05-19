@@ -1,13 +1,17 @@
 ﻿{
-  "name": "NextCBT - Exam Platform",
+  "name": "NextCBT - Ujian Online",
   "short_name": "NextCBT",
-  "description": "Computer Based Test Platform for Junior High School",
+  "description": "Platform Ujian Berbasis Komputer - Offline First, 1000 Siswa Concurrent",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#2563eb",
   "orientation": "portrait-primary",
+  "categories": ["education"],
+  "lang": "id",
+  "dir": "ltr",
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/icon-192.png",
@@ -20,6 +24,12 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
   "screenshots": [
@@ -27,7 +37,26 @@
       "src": "/screenshot-1.png",
       "sizes": "540x720",
       "type": "image/png",
-      "form_factor": "narrow"
+      "form_factor": "narrow",
+      "label": "Halaman Ujian"
     }
-  ]
+  ],
+  "shortcuts": [
+    {
+      "name": "Jadwal Ujian",
+      "short_name": "Ujian",
+      "url": "/student/exams",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Hasil Ujian",
+      "short_name": "Hasil",
+      "url": "/student/results",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "handle_links": "preferred",
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  }
 }
